@@ -1,0 +1,29 @@
+"use client";
+
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
+
+export function JoinQr({ code, size = 220 }: { code: string; size?: number }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const target = `${window.location.origin}/join/${code}`;
+    QRCode.toDataURL(target, { margin: 1, width: size * 2, color: { dark: "#3b2a1e", light: "#fbf3df" } })
+      .then((dataUrl) => {
+        setSrc(dataUrl);
+        setUrl(target);
+      })
+      .catch(() => setSrc(null));
+  }, [code, size]);
+  return (
+    <figure className="flex flex-col items-center gap-2">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a generated data URL, not a remote image
+        <img src={src} width={size} height={size} alt={`QR code to join with code ${code}`} className="pixelated" style={{ boxShadow: "0 0 0 4px #3b2a1e" }} />
+      ) : (
+        <div style={{ width: size, height: size }} />
+      )}
+      <figcaption className="text-center text-sm break-all">{url.replace(/^https?:\/\//, "")}</figcaption>
+    </figure>
+  );
+}

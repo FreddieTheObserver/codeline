@@ -1,0 +1,209 @@
+@import "tailwindcss";
+
+@theme {
+  --font-pixel: var(--font-pixelify), ui-monospace, monospace;
+  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, Consolas, monospace;
+
+  --color-ink: #3b2a1e;
+  --color-ink-soft: #6b5442;
+  --color-parchment: #fbf3df;
+  --color-parchment-dark: #ecdcb6;
+  --color-wood: #c98e5a;
+  --color-wood-dark: #7a4f2c;
+  --color-soil: #8a5a3b;
+  --color-soil-dark: #5e3b26;
+  --color-soil-light: #a8744f;
+  --color-grass: #7cbf5a;
+  --color-grass-dark: #4f8f3a;
+  --color-grass-light: #a4d77e;
+  --color-sky: #bfe3f5;
+  --color-sky-deep: #8fcbea;
+  --color-sun: #f6c445;
+  --color-leaf: #3f9b4f;
+  --color-leaf-dark: #2d7339;
+  --color-berry: #c8483f;
+  --color-berry-dark: #93302a;
+  --color-dusk: #f2a65a;
+  --color-plum: #6c4f8f;
+  --color-water: #5b8fd6;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  background: var(--color-grass);
+}
+
+body {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  background-color: var(--color-grass);
+  background-image:
+    linear-gradient(45deg, rgb(0 0 0 / 0.035) 25%, transparent 25%, transparent 75%, rgb(0 0 0 / 0.035) 75%),
+    linear-gradient(45deg, rgb(0 0 0 / 0.035) 25%, transparent 25%, transparent 75%, rgb(0 0 0 / 0.035) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-water);
+  outline-offset: 3px;
+}
+
+/* Students must see code exactly as typed: no "<=" drawn as a single arrow glyph. */
+:where(.font-mono, code, kbd, pre, samp, textarea) {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+/* Pixel borders: stepped box-shadows give the notched corners of a sprite frame.
+   Registered as utilities and driven by variables, so tones and variants never depend on rule order. */
+@utility px-panel {
+  background-color: var(--px-fill, var(--color-parchment));
+  color: var(--px-text, inherit);
+  margin: 4px;
+  box-shadow:
+    0 -4px 0 0 var(--px-edge, var(--color-wood-dark)),
+    0 4px 0 0 var(--px-edge, var(--color-wood-dark)),
+    -4px 0 0 0 var(--px-edge, var(--color-wood-dark)),
+    4px 0 0 0 var(--px-edge, var(--color-wood-dark)),
+    inset 0 -4px 0 0 var(--px-inset, var(--color-parchment-dark)),
+    inset 0 4px 0 0 var(--px-inset-top, transparent);
+}
+
+@utility px-panel-wood {
+  --px-fill: var(--color-wood);
+  --px-edge: var(--color-soil-dark);
+  --px-inset: rgb(0 0 0 / 0.18);
+  --px-inset-top: rgb(255 255 255 / 0.18);
+  --px-text: var(--color-parchment);
+}
+
+@utility px-btn {
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--px-btn-text, #fffaf0);
+  background-color: var(--px-btn, var(--color-leaf));
+  padding: 8px 16px;
+  margin: 4px;
+  cursor: pointer;
+  line-height: 1.2;
+  box-shadow:
+    0 -4px 0 0 var(--color-ink),
+    0 4px 0 0 var(--color-ink),
+    -4px 0 0 0 var(--color-ink),
+    4px 0 0 0 var(--color-ink),
+    inset 0 -4px 0 0 rgb(0 0 0 / 0.25),
+    inset 0 4px 0 0 rgb(255 255 255 / 0.25);
+  transition: transform 60ms ease-out, filter 120ms;
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  &:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow:
+      0 -4px 0 0 var(--color-ink),
+      0 4px 0 0 var(--color-ink),
+      -4px 0 0 0 var(--color-ink),
+      4px 0 0 0 var(--color-ink),
+      inset 0 4px 0 0 rgb(0 0 0 / 0.25);
+  }
+  &:disabled {
+    cursor: not-allowed;
+    filter: grayscale(0.7) opacity(0.6);
+  }
+}
+
+@utility px-btn-secondary {
+  --px-btn: var(--color-parchment);
+  --px-btn-text: var(--color-ink);
+}
+@utility px-btn-danger {
+  --px-btn: var(--color-berry);
+}
+@utility px-btn-sun {
+  --px-btn: var(--color-sun);
+  --px-btn-text: var(--color-ink);
+}
+@utility px-btn-water {
+  --px-btn: var(--color-water);
+}
+
+@utility px-input {
+  background-color: #fffdf6;
+  color: var(--color-ink);
+  padding: 8px 10px;
+  margin: 4px;
+  width: calc(100% - 8px);
+  box-shadow:
+    0 -3px 0 0 var(--color-ink-soft),
+    0 3px 0 0 var(--color-ink-soft),
+    -3px 0 0 0 var(--color-ink-soft),
+    3px 0 0 0 var(--color-ink-soft),
+    inset 0 3px 0 0 rgb(0 0 0 / 0.08);
+  &:focus {
+    outline: none;
+    box-shadow:
+      0 -3px 0 0 var(--color-water),
+      0 3px 0 0 var(--color-water),
+      -3px 0 0 0 var(--color-water),
+      3px 0 0 0 var(--color-water);
+  }
+}
+
+@utility pixelated {
+  image-rendering: pixelated;
+}
+
+/* Soil plot: a tilled tile with furrows. */
+@utility plot {
+  background-color: var(--plot-fill, var(--color-soil));
+  background-image: repeating-linear-gradient(0deg, rgb(0 0 0 / 0.12) 0 3px, transparent 3px 9px);
+  box-shadow:
+    0 -3px 0 0 var(--color-soil-dark),
+    0 3px 0 0 var(--color-soil-dark),
+    -3px 0 0 0 var(--color-soil-dark),
+    3px 0 0 0 var(--color-soil-dark);
+  margin: 3px;
+}
+
+@keyframes sprout-pop {
+  0% { transform: scale(0.4) translateY(6px); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes wilt-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px) rotate(-2deg); }
+  40% { transform: translateX(5px) rotate(2deg); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+@keyframes float-up {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-36px); opacity: 0; }
+}
+@keyframes drift {
+  from { transform: translateX(-20vw); }
+  to { transform: translateX(120vw); }
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.anim-sprout { animation: sprout-pop 420ms ease-out both; }
+.anim-wilt { animation: wilt-shake 420ms ease-in-out; }
+.anim-float { animation: float-up 1100ms ease-out forwards; }
+.anim-bob { animation: bob 2.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
