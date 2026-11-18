@@ -80,12 +80,14 @@ export function Play({ sessionId }: { sessionId: string }) {
   const left = useCountdown(round?.timer, offset, () => void mutate());
 
   const lastStatus = useRef<string | null>(null);
+  const lastPlaceSound = useRef(0);
   useEffect(() => {
     const status = round?.timer.status ?? null;
     if (status === lastStatus.current) return;
     if (sound && lastStatus.current !== null) {
       if (status === "running" && lastStatus.current !== "paused") sfx.roundStart();
-      if (status === "ended") sfx.roundEnd();
+      // When your own last seed ends the Round, its harvest jingle is enough.
+      if (status === "ended" && Date.now() - lastPlaceSound.current > 2000) sfx.roundEnd();
     }
     if (status === "running" && lastStatus.current !== "paused") {
       setFeedback(null);
@@ -130,7 +132,10 @@ export function Play({ sessionId }: { sessionId: string }) {
           key,
         });
         if (result.badges.length) setNewBadges(result.badges);
-        if (sound) (result.correct ? (result.handDone ? sfx.harvest : sfx.sprout) : sfx.wilt)();
+        if (sound) {
+          lastPlaceSound.current = Date.now();
+          (result.correct ? (result.handDone ? sfx.harvest : sfx.sprout) : sfx.wilt)();
+        }
         if (result.correct) setSelected(null);
         await mutate();
       } catch (err) {
@@ -173,6 +178,44 @@ export function Play({ sessionId }: { sessionId: string }) {
   const status = round?.timer.status;
   const handCards = (round?.hand ?? []).map((c) => ({ cardId: c.cardId, code: c.code, placed: Boolean(c.placedSlotId) }));
   const handDone = handCards.length > 0 && handCards.every((c) => c.placed);
+
+  // Shown in the seed pouch while the Round runs, and kept after it ends, so the last seed can still get a reason.
+  const feedbackBox = feedback && (
+    <div key={feedback.key} className="mb-3 bg-parchment p-2 text-ink" style={{ boxShadow: "0 0 0 3px #3b2a1e" }}>
+      <p className="flex items-center gap-2 font-bold" role="status">
+        <Sprite grid={feedback.kind === "bloom" ? BLOOM : WILT} scale={2} />
+        {feedback.text}
+      </p>
+      {reasonSaved ? (
+        <p className="mt-1 text-sm">Reason saved. Your lecturer can see it.</p>
+      ) : (
+        <form
+          className="mt-1 flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveReason();
+          }}
+        >
+          <label className="min-w-[200px] flex-1 text-sm">
+            <span className="sr-only">Why did you choose plot {feedback.slotPosition}?</span>
+            <input
+              className="px-input !py-1 text-sm"
+              placeholder={`Why plot ${feedback.slotPosition}? (optional)`}
+              value={reason}
+              maxLength={200}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </label>
+          <Button type="submit" tone="water" className="!px-3 !py-1 text-sm" disabled={!reason.trim()}>
+            Save
+          </Button>
+          <button type="button" className="text-sm underline" onClick={() => setFeedback(null)}>
+            Skip
+          </button>
+        </form>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -244,6 +287,7 @@ export function Play({ sessionId }: { sessionId: string }) {
             {(status === "ended" || status === "revealed") && data.result && (
               <ResultView result={data.result} revealed={round.revealed} />
             )}
+            {(status === "ended" || status === "revealed") && feedbackBox && <Panel className="!p-2">{feedbackBox}</Panel>}
             {(status === "ended" || status === "revealed") && !data.result && (
               <Panel className="text-center font-pixel" role="status">
                 You joined after this Round was dealt. Your seeds come with the next Round.
@@ -259,42 +303,7 @@ export function Play({ sessionId }: { sessionId: string }) {
             <ErrorNote>{placeError}</ErrorNote>
             {status === "running" || status === "paused" ? (
               <HandTray cards={handCards} selected={selected} onSelect={(id) => { setSelected(id); if (sound && id) sfx.tap(); }} disabled={status !== "running" || busy}>
-                {feedback && (
-                  <div key={feedback.key} className="mb-3 bg-parchment p-2 text-ink" style={{ boxShadow: "0 0 0 3px #3b2a1e" }}>
-                    <p className="flex items-center gap-2 font-bold" role="status">
-                      <Sprite grid={feedback.kind === "bloom" ? BLOOM : WILT} scale={2} />
-                      {feedback.text}
-                    </p>
-                    {reasonSaved ? (
-                      <p className="mt-1 text-sm">Reason saved. Your lecturer can see it.</p>
-                    ) : (
-                      <form
-                        className="mt-1 flex flex-wrap items-center gap-2"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          void saveReason();
-                        }}
-                      >
-                        <label className="min-w-[200px] flex-1 text-sm">
-                          <span className="sr-only">Why did you choose plot {feedback.slotPosition}?</span>
-                          <input
-                            className="px-input !py-1 text-sm"
-                            placeholder={`Why plot ${feedback.slotPosition}? (optional)`}
-                            value={reason}
-                            maxLength={200}
-                            onChange={(e) => setReason(e.target.value)}
-                          />
-                        </label>
-                        <Button type="submit" tone="water" className="!px-3 !py-1 text-sm" disabled={!reason.trim()}>
-                          Save
-                        </Button>
-                        <button type="button" className="text-sm underline" onClick={() => setFeedback(null)}>
-                          Skip
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                )}
+                {feedbackBox}
                 {handDone && (
                   <p className="mb-2 flex items-center gap-2 font-pixel text-parchment">
                     <Sprite grid={BASKET} scale={2} /> Your pouch is empty. Harvest time! Watch the projector.
@@ -336,6 +345,7 @@ function ResultView({ result, revealed }: { result: NonNullable<StudentState["re
           {climb > 0 && <strong> · you climbed {climb} {climb === 1 ? "place" : "places"}!</strong>}
         </p>
         <p className="text-sm">{revealed ? "The full solution is shown below." : "Your lecturer will reveal the solution soon."}</p>
+        <p className="text-xs text-ink-soft">A Round ends when time runs out or as soon as every gardener has planted every seed.</p>
       </div>
       {result.badges.length > 0 && (
         <div className="flex gap-2">
