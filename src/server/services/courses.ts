@@ -149,6 +149,32 @@ export async function createCourse(viewer: Viewer, input: { code: string; title:
   throw conflict("Couldn't create a unique join code. Try again.");
 }
 
+export async function deleteCourse(viewer: Viewer, courseId: string): Promise<void> {
+  const course = await staffAccess(viewer, courseId, "edit");
+  // The demo logins are public, so a visitor could otherwise wipe the sample courses before a demo.
+  if (course.isSample) throw conflict("Sample courses stay for the demo, so they can't be deleted.");
+  if ((await liveSessions([courseId])).size) throw conflict("A Session is still open. Close it in the console, then delete the course.");
+  // Rounds point at their Exercise without a cascade, so the Sessions and their Rounds go first;
+  // the course row then takes its Exercises, enrolments and TA links with it.
+  await db.transaction(async (tx) => {
+    await tx.delete(sessions).where(eq(sessions.courseId, courseId));
+    // Simulated classmates are made for one course and can't sign in, so they would be left belonging nowhere.
+    const ownSimulated = tx
+      .select({ id: users.id })
+      .from(users)
+      .innerJoin(enrolments, eq(enrolments.userId, users.id))
+      .where(
+        and(
+          eq(enrolments.courseId, courseId),
+          eq(users.isSimulated, true),
+          sql`not exists (select 1 from ${enrolments} other where other.user_id = ${users.id} and other.course_id <> ${courseId})`,
+        ),
+      );
+    await tx.delete(users).where(inArray(users.id, ownSimulated));
+    await tx.delete(courses).where(eq(courses.id, courseId));
+  });
+}
+
 export async function courseDetail(viewer: Viewer, courseId: string): Promise<CourseDetail> {
   const course = await staffAccess(viewer, courseId, "read");
   const [card] = await staffCards(viewer, [course]);

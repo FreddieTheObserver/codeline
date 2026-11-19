@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useToast } from "@/components/feedback";
+import { useConfirm, useToast } from "@/components/feedback";
 import { JoinQr } from "@/components/garden/JoinQr";
 import { PageShell } from "@/components/PageShell";
 import { Sprite } from "@/components/pixel/Sprite";
 import { SPROUT } from "@/components/pixel/sprites";
-import { ButtonLink, EmptyState, ErrorNote, ErrorState, Heading, LanguageTag, Loading, PageHeader, Panel, SampleTag, Tag, cx } from "@/components/ui";
-import { errorText, post, useApi } from "@/lib/client";
+import { Button, ButtonLink, EmptyState, ErrorNote, ErrorState, Heading, LanguageTag, Loading, PageHeader, Panel, SampleTag, Tag, cx } from "@/components/ui";
+import { del, errorText, post, useApi } from "@/lib/client";
 import type { CourseDetail, SessionSummary } from "@/lib/api-types";
 import { Dashboard } from "./Dashboard";
 import { SessionSetup } from "./SessionSetup";
@@ -24,6 +24,7 @@ const SESSION_STATUS: Record<SessionSummary["status"], { label: string; color: s
 export function CourseView({ courseId, initialTab }: { courseId: string; initialTab: CourseTab }) {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const { data, error, mutate } = useApi<CourseDetail>(`/api/courses/${courseId}`, { refreshInterval: 10000 });
   const [tab, setTab] = useState<CourseTab>(initialTab);
   const [actionError, setActionError] = useState("");
@@ -70,6 +71,27 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
       router.push(`/teach/exercises/${copy}`);
     } catch (err) {
       setActionError(errorText(err));
+    }
+  }
+
+  async function removeCourse() {
+    const students =
+      course.enrolled === 0 ? ""
+      : course.enrolled === 1 ? " Its 1 enrolled student loses it from their valley."
+      : ` Its ${course.enrolled} enrolled students lose it from their valley.`;
+    const ok = await confirm({
+      title: `Delete ${course.code}?`,
+      body: `${course.code} is removed with its Exercises, every Session and all results, and students lose its crops from their almanacs.${students} This can't be undone.`,
+      confirmLabel: "Delete course",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      await del(`/api/courses/${courseId}`);
+      toast(`${course.code} is deleted.`);
+      router.push("/teach");
+    } catch (err) {
+      toast(`Couldn't delete ${course.code}: ${errorText(err)}`, "error");
     }
   }
 
@@ -231,6 +253,14 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
           </Panel>
         )}
       </div>
+
+      {course.canEdit && !course.isSample && (
+        <div className="mt-8 flex justify-end">
+          <Button tone="danger" onClick={removeCourse}>
+            Delete course
+          </Button>
+        </div>
+      )}
     </PageShell>
   );
 }
