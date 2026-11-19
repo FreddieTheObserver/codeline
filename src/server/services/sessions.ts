@@ -500,8 +500,10 @@ export async function giveReason(viewer: Viewer, placementId: string, reason: st
 
 export async function spotlightPlacement(viewer: Viewer, sessionId: string, placementId: string): Promise<void> {
   await db.transaction(async (tx) => {
-    const { course } = await loadSession(tx, sessionId);
+    const { s, course } = await loadSession(tx, sessionId);
     await staffAccess(viewer, course.id, "run");
+    // After closing, points have become XP and the projector shows the finale, so a Spotlight would only hand out XP.
+    if (s.status === "closed") throw conflict("This Session has closed, so its reasons can't be spotlighted any more.");
     const [p] = await tx
       .select({ p: placements })
       .from(placements)
