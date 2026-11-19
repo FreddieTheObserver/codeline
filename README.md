@@ -38,7 +38,10 @@ bun run typecheck
 bun run lint
 bun run test
 bun scripts/smoke.ts            # end-to-end API test against a running server (BASE_URL, default :3210)
+node scripts/ui-check.mjs       # browser checks: dialogs, sign-in and sign-out, returning to a page
 ```
+
+Both end-to-end checks create data, so run them only against a local database, then reseed.
 
 ## Deploy
 
