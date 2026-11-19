@@ -5,6 +5,7 @@ import { PageShell } from "@/components/PageShell";
 import { ErrorState, LanguageTag, Loading, PageHeader, Panel, SampleTag, Stat, pct } from "@/components/ui";
 import { useApi } from "@/lib/client";
 import type { TaOverview } from "@/lib/api-types";
+import { courseHref } from "@/app/teach/courses/[courseId]/tabs";
 
 export function TaOverviewView() {
   const { data, error } = useApi<TaOverview>("/api/ta/overview");
@@ -46,7 +47,7 @@ export function TaOverviewView() {
             {data.courses.map((c) => (
               <tr key={c.id} className="border-t border-parchment-dark align-top">
                 <td className="py-2">
-                  <Link href={`/teach/courses/${c.id}`} className="font-bold underline">
+                  <Link href={courseHref(c.id, "dashboard")} className="font-bold underline">
                     {c.code}
                   </Link>{" "}
                   <LanguageTag language={c.language} /> {c.isSample && <SampleTag />}
