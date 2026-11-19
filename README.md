@@ -70,6 +70,12 @@ They and the capture script stop if the address isn't on this machine, unless `-
 4. Add `codeline.layaungphyo.dev` under the project's Domains, then create the `codeline` CNAME record with the target Vercel shows.
 5. Free Supabase projects pause after 7 days without activity: open the app or the dashboard before a demo.
 
+### Check what the live database holds
+
+`bun scripts/db-report.ts PROD_DATABASE_URL` prints, in a read-only transaction, the accounts, courses, Exercises and Sessions added since the sample data was seeded.
+Put the Session pooler string in `.env` as `PROD_DATABASE_URL`, a name nothing else reads.
+Don't store it as `DATABASE_URL` or `MIGRATION_DATABASE_URL`: local migrations and `db:seed -- --reset` would then run against production.
+
 ## Screens and the UI deliverable PDF
 
 ```sh
