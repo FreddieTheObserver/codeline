@@ -46,8 +46,11 @@ export function ExerciseEditor({
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [testing, setTesting] = useState(false);
   useLeaveGuard(canEdit && dirty, initial ? initial.title : "this new Exercise");
+  // Next.js keeps this page alive for a Back press after deleting, so the button must not still be busy then.
+  useLayoutEffect(() => () => setRemoving(false), []);
 
   // Next.js keeps the New Exercise page alive after it moves on to the saved Exercise.
   // Once that Exercise exists, the next visit must start from a blank form, not from it.
@@ -134,18 +137,20 @@ export function ExerciseEditor({
       tone: "danger",
     });
     if (!ok) return;
+    setRemoving(true);
     try {
       await del(`/api/exercises/${initial.id}`);
       setDirty(false);
       toast(`${initial.title} is deleted.`);
       router.push(courseHref(courseId));
     } catch (err) {
+      setRemoving(false);
       setError(errorText(err));
     }
   }
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader
         breadcrumbs={[
           { label: "My courses", href: "/teach" },
@@ -303,15 +308,15 @@ export function ExerciseEditor({
           {canEdit && (
             <div className="sticky bottom-0 z-20">
               <Panel className="flex flex-wrap items-center gap-x-3 gap-y-1 !py-2">
-                <Button onClick={save} disabled={busy || (Boolean(initial) && !dirty)}>
-                  {busy ? "Saving..." : initial ? "Save changes" : "Create Exercise"}
+                <Button onClick={save} busy={busy} disabled={Boolean(initial) && !dirty}>
+                  {busy ? "Saving" : initial ? "Save changes" : "Create Exercise"}
                 </Button>
                 <span className="text-sm text-ink-soft" role="status">
                   {!initial ? "Not created yet." : dirty ? "You have unsaved changes." : "All changes saved."}
                 </span>
                 {initial && !initial.played && (
-                  <Button tone="danger" onClick={remove} className="ml-auto">
-                    Delete
+                  <Button tone="danger" onClick={remove} busy={removing} disabled={busy} className="ml-auto">
+                    {removing ? "Deleting" : "Delete"}
                   </Button>
                 )}
                 {error && (

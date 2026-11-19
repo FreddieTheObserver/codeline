@@ -34,7 +34,7 @@ export function SessionReportView({ courseId, sessionId }: { courseId: string; s
   const live = session.status !== "closed";
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader
         breadcrumbs={[
           { label: "My courses", href: "/teach" },

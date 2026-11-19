@@ -20,7 +20,7 @@ export function StudentView({ courseId, userId }: { courseId: string; userId: st
   for (const p of data.placements) byExercise.set(p.exerciseTitle, [...(byExercise.get(p.exerciseTitle) ?? []), p]);
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader
         breadcrumbs={[
           { label: "My courses", href: "/teach" },

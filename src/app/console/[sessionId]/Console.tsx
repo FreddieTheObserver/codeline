@@ -35,7 +35,8 @@ export function Console({ sessionId }: { sessionId: string }) {
     onSuccess: (d) => setOffset(serverOffset(d.serverNow, Date.now())),
   });
   const [actionError, setActionError] = useState("");
-  const [busy, setBusy] = useState(false);
+  // The control waiting on the server; it shows working dots while every other control waits.
+  const [busy, setBusy] = useState<ControlAction | "bots" | null>(null);
   const [botsOn, setBotsOn] = useState(true);
   const [botCount, setBotCount] = useState(20);
   const left = useCountdown(data?.round?.timer, offset, () => void mutate());
@@ -66,7 +67,7 @@ export function Console({ sessionId }: { sessionId: string }) {
   // The console only follows the current Round; a closed Session is looked back on in its summary, every Round at once.
   if (closed) {
     return (
-      <PageShell>
+      <PageShell reveal>
         <PageHeader
           breadcrumbs={[{ label: "My courses", href: "/teach" }, { label: session.courseCode, href: courseHref(session.courseId) }, { label: "Live console" }]}
           title="Live console"
@@ -99,7 +100,7 @@ export function Console({ sessionId }: { sessionId: string }) {
   const live = status === "running" || status === "paused";
 
   async function run(action: ControlAction, done: string) {
-    setBusy(true);
+    setBusy(action);
     setActionError("");
     try {
       await post(`/api/sessions/${sessionId}/control`, { action });
@@ -108,7 +109,7 @@ export function Console({ sessionId }: { sessionId: string }) {
     } catch (err) {
       setActionError(errorText(err));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -177,7 +178,7 @@ export function Console({ sessionId }: { sessionId: string }) {
       tone: "water",
     });
     if (!ok) return;
-    setBusy(true);
+    setBusy("bots");
     setActionError("");
     try {
       const { added } = await post<{ added: number }>(`/api/sessions/${sessionId}/bots`, { count: botCount });
@@ -186,7 +187,7 @@ export function Console({ sessionId }: { sessionId: string }) {
     } catch (err) {
       setActionError(errorText(err));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -239,27 +240,27 @@ export function Console({ sessionId }: { sessionId: string }) {
   const roundButtons = (short: boolean) => (
     <>
       {(!round || (!live && hasNext)) && (
-        <Button tone={!round || status === "revealed" ? "sun" : "secondary"} disabled={busy} onClick={start}>
+        <Button tone={!round || status === "revealed" ? "sun" : "secondary"} busy={busy === "start" || busy === "next"} disabled={busy !== null} onClick={start}>
           Start Round {round ? nextNo : 1}
         </Button>
       )}
       {status === "running" && (
-        <Button tone="secondary" disabled={busy} onClick={() => run("pause", "Round paused.")}>
+        <Button tone="secondary" busy={busy === "pause"} disabled={busy !== null} onClick={() => run("pause", "Round paused.")}>
           Pause
         </Button>
       )}
       {status === "paused" && (
-        <Button disabled={busy} onClick={() => run("resume", "Round resumed.")}>
+        <Button busy={busy === "resume"} disabled={busy !== null} onClick={() => run("resume", "Round resumed.")}>
           Resume
         </Button>
       )}
       {live && (
-        <Button tone="secondary" disabled={busy} onClick={endRound}>
+        <Button tone="secondary" busy={busy === "end"} disabled={busy !== null} onClick={endRound}>
           {short ? "End" : "End Round"}
         </Button>
       )}
       {round && status !== "revealed" && (
-        <Button tone={status === "ended" ? "sun" : "secondary"} disabled={busy} onClick={reveal}>
+        <Button tone={status === "ended" ? "sun" : "secondary"} busy={busy === "reveal"} disabled={busy !== null} onClick={reveal}>
           {short ? "Reveal" : "Reveal solution"}
         </Button>
       )}
@@ -308,7 +309,7 @@ export function Console({ sessionId }: { sessionId: string }) {
           className="px-input !w-20"
           aria-label="How many simulated students"
         />
-        <Button tone="water" disabled={busy} onClick={addBots}>
+        <Button tone="water" busy={busy === "bots"} disabled={busy !== null} onClick={addBots}>
           Add
         </Button>
         <label className="flex items-center gap-2 text-sm">
@@ -335,7 +336,7 @@ export function Console({ sessionId }: { sessionId: string }) {
             : "That was the last Round. Close the Session to turn points into XP.";
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader
         breadcrumbs={[{ label: "My courses", href: "/teach" }, { label: session.courseCode, href: courseHref(session.courseId) }, { label: "Live console" }]}
         title="Live console"
@@ -368,7 +369,7 @@ export function Console({ sessionId }: { sessionId: string }) {
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-parchment-dark pt-3">
               <p className="text-xs text-ink-soft">Closing ends the Session for everyone and turns points into XP.</p>
-              <Button tone="danger" disabled={busy} onClick={closeSession}>
+              <Button tone="danger" busy={busy === "close"} disabled={busy !== null} onClick={closeSession}>
                 Close Session
               </Button>
             </div>

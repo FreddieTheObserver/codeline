@@ -55,7 +55,7 @@ export function Dashboard({ courseId }: { courseId: string }) {
   );
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    <div className="anim-reveal grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <Panel>
         <Heading>Hardest steps</Heading>
         <p className="text-sm">Share of students right on the first try, and where they most often put the line instead. Use it to decide what to reteach.</p>

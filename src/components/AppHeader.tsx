@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { errorText, post, useApi } from "@/lib/client";
 import { hasUnsavedChanges, setLeaving } from "@/lib/leaving";
 import type { Viewer } from "@/lib/api-types";
@@ -47,6 +47,7 @@ export function AppHeader() {
   const { data } = useApi<{ viewer: Viewer | null }>("/api/me");
   const viewer = data?.viewer ?? null;
   const links = navFor(viewer);
+  const [signingOut, setSigningOut] = useState(false);
 
   async function signOut() {
     if (hasUnsavedChanges()) {
@@ -60,10 +61,12 @@ export function AppHeader() {
       if (!ok) return;
     }
     setLeaving(true);
+    setSigningOut(true);
     try {
       await post("/api/auth/signout");
     } catch (err) {
       setLeaving(false);
+      setSigningOut(false);
       toast(`Couldn't sign out: ${errorText(err)}`, "error");
       return;
     }
@@ -92,8 +95,8 @@ export function AppHeader() {
               <span className="block text-sm font-bold">{viewer.name}</span>
               <span className="block text-xs opacity-85">{roleLabel(viewer)}</span>
             </span>
-            <Button tone="secondary" className="!px-3 !py-1 text-sm" onClick={signOut}>
-              Sign out
+            <Button tone="secondary" className="!px-3 !py-1 text-sm" busy={signingOut} onClick={signOut}>
+              {signingOut ? "Signing out" : "Sign out"}
             </Button>
           </>
         ) : data ? (

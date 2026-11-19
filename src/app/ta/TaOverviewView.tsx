@@ -14,7 +14,7 @@ export function TaOverviewView() {
   const totals = data.courses.reduce((a, c) => ({ sessions: a.sessions + c.sessions, rounds: a.rounds + c.rounds, placements: a.placements + c.placements, enrolled: a.enrolled + c.enrolled }), { sessions: 0, rounds: 0, placements: 0, enrolled: 0 });
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader
         title="Department overview"
         description="Every course, read-only. Export the numbers to prepare a report for the lecturers. The CSV marks simulated students so they can be filtered out."

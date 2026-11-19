@@ -31,6 +31,13 @@
 
 :root {
   color-scheme: light;
+  /* One set of timings, so every fade feels like the same app. Exits are quicker than entrances.
+     Named --motion-* because Tailwind already owns --ease-* and --animate-*. */
+  --motion-enter: 240ms;
+  --motion-exit: 150ms; /* EXIT_MS in src/components/motion.tsx waits this long before unmounting. */
+  --motion-slow: 700ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
 }
 
 html {
@@ -116,6 +123,11 @@ body {
     cursor: not-allowed;
     filter: grayscale(0.7) opacity(0.6);
   }
+  /* A busy button is working, not unavailable, so it keeps its colour. */
+  &[aria-busy="true"] {
+    cursor: progress;
+    filter: none;
+  }
 }
 
 @utility px-btn-secondary {
@@ -189,7 +201,16 @@ body {
     background: rgb(59 42 30 / 0.55);
   }
   &[open] {
-    animation: dialog-in 140ms ease-out;
+    animation: dialog-in var(--motion-enter) var(--motion-ease-out);
+  }
+  &[open]::backdrop {
+    animation: fade-in var(--motion-enter) var(--motion-ease-out);
+  }
+  &[data-closing] {
+    animation: dialog-out var(--motion-exit) var(--motion-ease-in) forwards;
+  }
+  &[data-closing]::backdrop {
+    animation: fade-out var(--motion-exit) var(--motion-ease-in) forwards;
   }
 }
 
@@ -229,20 +250,65 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
 }
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes fade-out {
+  to { opacity: 0; }
+}
 @keyframes dialog-in {
-  from { transform: translateY(8px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { transform: translateY(8px) scale(0.98); opacity: 0; }
+}
+@keyframes dialog-out {
+  to { transform: translateY(6px) scale(0.98); opacity: 0; }
 }
 @keyframes toast-in {
   from { transform: translateY(var(--toast-from, 12px)); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
 }
-/* Toasts sit at the top on phones and at the bottom from sm up, so they slide in from that edge. */
+@keyframes toast-out {
+  to { transform: translateY(var(--toast-from, 12px)); opacity: 0; }
+}
+/* Ends fully visible, so under reduced motion the dots stand still instead of fading away. */
+@keyframes busy-dot {
+  0%, 70%, 100% { opacity: 1; }
+  35% { opacity: 0.2; }
+}
+/* Toasts sit at the top on phones and at the bottom from sm up, so they slide in from that edge and leave the same way. */
 .anim-toast {
   --toast-from: -12px;
-  animation: toast-in 180ms ease-out both;
+  animation: toast-in var(--motion-enter) var(--motion-ease-out) both;
   @variant sm {
     --toast-from: 12px;
+  }
+}
+.anim-toast[data-leaving] {
+  animation: toast-out var(--motion-exit) var(--motion-ease-in) forwards;
+  pointer-events: none;
+}
+/* Fast loads finish before the loader would show, so it never flashes; slow ones still get it. */
+.anim-loader {
+  animation: fade-in var(--motion-enter) var(--motion-ease-out) 300ms both;
+}
+/* Opacity only: a transform here would trap the fixed and sticky bars inside the page while it runs. */
+.anim-reveal {
+  animation: fade-in var(--motion-enter) var(--motion-ease-out);
+}
+.busy-dots {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 8px;
+  vertical-align: middle;
+  & > span {
+    width: 4px;
+    height: 4px;
+    background: currentColor;
+    animation: busy-dot 1s var(--motion-ease-out) infinite;
+  }
+  & > span:nth-child(2) {
+    animation-delay: 160ms;
+  }
+  & > span:nth-child(3) {
+    animation-delay: 320ms;
   }
 }
 .anim-sprout { animation: sprout-pop 420ms ease-out both; }

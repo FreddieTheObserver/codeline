@@ -16,7 +16,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await chromium.launch({ channel: "msedge" });
 
 async function actor(loginId, viewport = { width: 1440, height: 900 }) {
-  const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+  // Reduced motion makes fades and count-ups finish at once, so no screenshot catches one halfway.
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1, reducedMotion: "reduce" });
   if (loginId) {
     const res = await context.request.post(`${BASE}/api/auth/signin`, { data: { loginId, password: PASSWORD } });
     if (!res.ok()) throw new Error(`sign-in failed for ${loginId}: ${res.status()}`);

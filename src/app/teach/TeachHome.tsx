@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useState } from "react";
 import { Modal, useToast } from "@/components/feedback";
+import { usePresence } from "@/components/motion";
 import { PageShell } from "@/components/PageShell";
 import { Sprite } from "@/components/pixel/Sprite";
 import { SPROUT, TREE } from "@/components/pixel/sprites";
@@ -16,13 +17,14 @@ export function TeachHome() {
   const [creating, setCreating] = useState(false);
   // Next.js keeps this page alive while hidden; a dialog left open must not be waiting when the lecturer returns.
   useLayoutEffect(() => () => setCreating(false), []);
+  const createDialog = usePresence(creating);
 
   if (error) return <PageShell><ErrorState message={error.message} backHref="/" backLabel="Back to the start" /></PageShell>;
   if (!data) return <PageShell><Loading /></PageShell>;
   const isLecturer = data.viewer.role === "lecturer";
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader
         title={isLecturer ? "My courses" : "Courses I assist"}
         description={
@@ -60,7 +62,7 @@ export function TeachHome() {
         </ul>
       )}
 
-      {creating && <CreateCourseDialog onClose={() => setCreating(false)} />}
+      {createDialog.mounted && <CreateCourseDialog closing={createDialog.closing} onClose={() => setCreating(false)} />}
     </PageShell>
   );
 }
@@ -105,7 +107,7 @@ function CourseCardView({ course: c }: { course: StaffCourseCard }) {
   );
 }
 
-function CreateCourseDialog({ onClose }: { onClose: () => void }) {
+function CreateCourseDialog({ closing, onClose }: { closing: boolean; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
   const [form, setForm] = useState({ code: "", title: "", language: "java" });
@@ -127,7 +129,7 @@ function CreateCourseDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Create a course" onClose={onClose}>
+    <Modal title="Create a course" closing={closing} onClose={onClose}>
       <p className="mt-1 text-sm">Any programming course the department offers, in any language. Students enrol with the join code CodeLine creates for it.</p>
       <form onSubmit={create} className="mt-3 grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)]">
         <Field label="Code">
@@ -160,8 +162,8 @@ function CreateCourseDialog({ onClose }: { onClose: () => void }) {
             <Button type="button" tone="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy}>
-              {busy ? "Creating..." : "Create course"}
+            <Button type="submit" busy={busy}>
+              {busy ? "Creating" : "Create course"}
             </Button>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { JoinQr } from "@/components/garden/JoinQr";
 import { PageShell } from "@/components/PageShell";
@@ -28,6 +28,10 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
   const { data, error, mutate } = useApi<CourseDetail>(`/api/courses/${courseId}`, { refreshInterval: 10000 });
   const [tab, setTab] = useState<CourseTab>(initialTab);
   const [actionError, setActionError] = useState("");
+  // Which action is waiting on the server: an Exercise id while it is duplicated, or "delete" for the course.
+  const [working, setWorking] = useState<string | null>(null);
+  // Both actions move on to another page, which Next.js keeps alive for a Back press: nothing may stay busy then.
+  useLayoutEffect(() => () => setWorking(null), []);
 
   if (error) return <PageShell><ErrorState message={error.message} backHref="/teach" backLabel="Back to my courses" /></PageShell>;
   if (!data) return <PageShell><Loading /></PageShell>;
@@ -65,11 +69,13 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
 
   async function duplicate(id: string, title: string) {
     setActionError("");
+    setWorking(id);
     try {
       const { id: copy } = await post<{ id: string }>(`/api/exercises/${id}/duplicate`);
       toast(`Made a copy of ${title}. You're editing the copy now.`);
       router.push(`/teach/exercises/${copy}`);
     } catch (err) {
+      setWorking(null);
       setActionError(errorText(err));
     }
   }
@@ -86,17 +92,19 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
       tone: "danger",
     });
     if (!ok) return;
+    setWorking("delete");
     try {
       await del(`/api/courses/${courseId}`);
       toast(`${course.code} is deleted.`);
       router.push("/teach");
     } catch (err) {
+      setWorking(null);
       toast(`Couldn't delete ${course.code}: ${errorText(err)}`, "error");
     }
   }
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader
         breadcrumbs={[{ label: "My courses", href: "/teach" }, { label: course.code }]}
         tags={
@@ -182,9 +190,16 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
                         {course.canEdit ? "Edit" : "View"}
                       </ButtonLink>
                       {course.canEdit && (
-                        <button type="button" className="px-btn px-btn-secondary !py-1" onClick={() => duplicate(e.id, e.title)}>
-                          Duplicate
-                        </button>
+                        <Button
+                          type="button"
+                          tone="secondary"
+                          className="!py-1"
+                          busy={working === e.id}
+                          disabled={working !== null}
+                          onClick={() => duplicate(e.id, e.title)}
+                        >
+                          {working === e.id ? "Duplicating" : "Duplicate"}
+                        </Button>
                       )}
                     </span>
                   </li>
@@ -256,8 +271,8 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
 
       {course.canEdit && !course.isSample && (
         <div className="mt-8 flex justify-end">
-          <Button tone="danger" onClick={removeCourse}>
-            Delete course
+          <Button tone="danger" busy={working === "delete"} disabled={working !== null} onClick={removeCourse}>
+            {working === "delete" ? "Deleting" : "Delete course"}
           </Button>
         </div>
       )}

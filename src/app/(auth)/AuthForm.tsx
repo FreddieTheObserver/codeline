@@ -105,8 +105,8 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
                   />
                 </Field>
                 <ErrorNote>{error}</ErrorNote>
-                <Button type="submit" disabled={busy}>
-                  {busy ? "One moment..." : mode === "signup" ? "Create account" : "Sign in"}
+                <Button type="submit" busy={busy}>
+                  {busy ? "One moment" : mode === "signup" ? "Create account" : "Sign in"}
                 </Button>
               </form>
               <p className="mt-4 text-sm">

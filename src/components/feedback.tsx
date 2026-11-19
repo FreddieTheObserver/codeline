@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { EXIT_MS } from "./motion";
 import { Sprite } from "./pixel/Sprite";
 import { BLOOM, WILT } from "./pixel/sprites";
 import { Button, ErrorNote, Field, Heading, cx } from "./ui";
@@ -30,7 +31,7 @@ type Request =
   | { kind: "prompt"; id: number; options: PromptOptions; resolve: (value: string | null) => void };
 
 type ToastTone = "ok" | "error";
-type Toast = { id: number; text: string; tone: ToastTone };
+type Toast = { id: number; text: string; tone: ToastTone; leaving?: boolean };
 
 type Feedback = {
   confirm: (options: ConfirmOptions) => Promise<boolean>;
@@ -56,14 +57,16 @@ function settle(request: Request) {
 
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<Request | null>(null);
+  const [closingId, setClosingId] = useState<number | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const current = useRef<Request | null>(null);
   const seq = useRef(0);
 
   const open = useCallback((next: Request | null) => {
-    // A new question replaces one left open, which counts as cancelled.
+    // A new question replaces one left open, which counts as cancelled, and one still fading out.
     if (current.current && current.current !== next) settle(current.current);
     current.current = next;
+    setClosingId(null);
     setRequest(next);
   }, []);
 
@@ -75,11 +78,18 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
     (options: PromptOptions) => new Promise<string | null>((resolve) => open({ kind: "prompt", id: ++seq.current, options, resolve })),
     [open],
   );
-  const toast = useCallback((text: string, tone: ToastTone = "ok") => {
-    const id = ++seq.current;
-    setToasts((list) => [...list.slice(-2), { id, text, tone }]);
-    window.setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 4500);
+  const dismiss = useCallback((id: number) => {
+    setToasts((list) => list.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+    window.setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), EXIT_MS);
   }, []);
+  const toast = useCallback(
+    (text: string, tone: ToastTone = "ok") => {
+      const id = ++seq.current;
+      setToasts((list) => [...list.slice(-2), { id, text, tone }]);
+      window.setTimeout(() => dismiss(id), 4500);
+    },
+    [dismiss],
+  );
 
   useEffect(() => {
     let text: string | null = null;
@@ -90,20 +100,28 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
     if (text) toast(text);
   }, [toast]);
 
+  // The answer goes back at once, so the caller's work starts while the dialog fades out.
   const finish = (r: Request, value: boolean | string | null) => {
+    if (current.current !== r) return;
     current.current = null;
-    setRequest(null);
     if (r.kind === "confirm") r.resolve(value === true);
     else r.resolve(typeof value === "string" ? value : null);
+    setClosingId(r.id);
+    window.setTimeout(() => setRequest((shown) => (shown === r ? null : shown)), EXIT_MS);
   };
 
   const value = useMemo(() => ({ confirm, prompt, toast }), [confirm, prompt, toast]);
+  const closing = request !== null && closingId === request.id;
 
   return (
     <FeedbackContext value={value}>
       {children}
-      {request?.kind === "confirm" && <ConfirmDialog key={request.id} options={request.options} onDone={(ok) => finish(request, ok)} />}
-      {request?.kind === "prompt" && <PromptDialog key={request.id} options={request.options} onDone={(v) => finish(request, v)} />}
+      {request?.kind === "confirm" && (
+        <ConfirmDialog key={request.id} options={request.options} closing={closing} onDone={(ok) => finish(request, ok)} />
+      )}
+      {request?.kind === "prompt" && (
+        <PromptDialog key={request.id} options={request.options} closing={closing} onDone={(v) => finish(request, v)} />
+      )}
       {/* On phones the bottom edge belongs to sticky bars such as the seed pouch, so messages appear at the top there. */}
       <div
         role="status"
@@ -113,16 +131,12 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
+            data-leaving={t.leaving || undefined}
             className={cx("anim-toast px-panel pointer-events-auto flex max-w-sm items-center gap-3 px-4 py-2 text-sm font-bold", t.tone === "error" && "!bg-[#fde4df]")}
           >
             <Sprite grid={t.tone === "ok" ? BLOOM : WILT} scale={2} />
             <span className="flex-1">{t.text}</span>
-            <button
-              type="button"
-              className="px-1 text-ink-soft hover:text-ink"
-              aria-label="Dismiss message"
-              onClick={() => setToasts((list) => list.filter((x) => x.id !== t.id))}
-            >
+            <button type="button" className="px-1 text-ink-soft hover:text-ink" aria-label="Dismiss message" onClick={() => dismiss(t.id)}>
               ✕
             </button>
           </div>
@@ -143,7 +157,8 @@ export const usePrompt = () => useFeedback().prompt;
 export const useToast = () => useFeedback().toast;
 
 // A modal on the native <dialog>: the browser traps focus, makes the page inert and closes it on Escape.
-export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+// While `closing` it plays its exit animation with its contents inert, so a second click can't answer again.
+export function Modal({ title, children, onClose, closing = false }: { title: string; children: ReactNode; onClose: () => void; closing?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const pressedOnBackdrop = useRef(false);
   const titleId = useId();
@@ -167,18 +182,19 @@ export function Modal({ title, children, onClose }: { title: string; children: R
       ref={ref}
       className="px-dialog"
       aria-labelledby={titleId}
+      data-closing={closing || undefined}
       onCancel={(e) => {
         e.preventDefault();
-        onClose();
+        if (!closing) onClose();
       }}
       onMouseDown={(e) => {
         pressedOnBackdrop.current = e.target === e.currentTarget;
       }}
       onClick={(e) => {
-        if (pressedOnBackdrop.current && e.target === e.currentTarget) onClose();
+        if (!closing && pressedOnBackdrop.current && e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="px-panel p-5">
+      <div className="px-panel p-5" inert={closing}>
         <Heading>
           <span id={titleId}>{title}</span>
         </Heading>
@@ -188,12 +204,14 @@ export function Modal({ title, children, onClose }: { title: string; children: R
   );
 }
 
-function ConfirmDialog({ options, onDone }: { options: ConfirmOptions; onDone: (ok: boolean) => void }) {
+type DialogProps<T> = { closing: boolean; onDone: (value: T) => void };
+
+function ConfirmDialog({ options, closing, onDone }: { options: ConfirmOptions } & DialogProps<boolean>) {
   const tone = options.tone ?? "leaf";
   // Destructive questions start on Cancel, so a stray Enter never deletes anything.
   const safeFirst = tone === "danger";
   return (
-    <Modal title={options.title} onClose={() => onDone(false)}>
+    <Modal title={options.title} closing={closing} onClose={() => onDone(false)}>
       {options.body && <div className="mt-2 flex flex-col gap-2 text-sm">{options.body}</div>}
       <div className="mt-5 flex flex-wrap justify-end gap-1">
         <Button type="button" tone="secondary" onClick={() => onDone(false)} data-autofocus={safeFirst ? "" : undefined}>
@@ -207,7 +225,7 @@ function ConfirmDialog({ options, onDone }: { options: ConfirmOptions; onDone: (
   );
 }
 
-function PromptDialog({ options, onDone }: { options: PromptOptions; onDone: (value: string | null) => void }) {
+function PromptDialog({ options, closing, onDone }: { options: PromptOptions } & DialogProps<string | null>) {
   const [value, setValue] = useState(options.initial ?? "");
   const [error, setError] = useState("");
 
@@ -222,7 +240,7 @@ function PromptDialog({ options, onDone }: { options: PromptOptions; onDone: (va
   }
 
   return (
-    <Modal title={options.title} onClose={() => onDone(null)}>
+    <Modal title={options.title} closing={closing} onClose={() => onDone(null)}>
       {options.body && <div className="mt-2 text-sm">{options.body}</div>}
       <form onSubmit={submit} className="mt-3" noValidate>
         <Field label={options.label} hint={options.hint}>

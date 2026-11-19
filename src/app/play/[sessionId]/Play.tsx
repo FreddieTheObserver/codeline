@@ -231,7 +231,7 @@ export function Play({ sessionId }: { sessionId: string }) {
   const roundOver = status === "ended" || status === "revealed";
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <div className="flex flex-col gap-3">
         <Panel className="flex flex-wrap items-center gap-x-6 gap-y-2 !py-2">
           <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">

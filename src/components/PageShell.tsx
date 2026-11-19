@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { AppHeader } from "./AppHeader";
 import { SiteFooter } from "./SiteFooter";
 
-export function PageShell({ children }: { children: ReactNode }) {
+// Pages that show a loader first pass `reveal` once their data arrives, so the content fades in where the loader was.
+export function PageShell({ children, reveal }: { children: ReactNode; reveal?: boolean }) {
   return (
     <>
       <a
@@ -14,7 +15,7 @@ export function PageShell({ children }: { children: ReactNode }) {
       <div className="page-container pt-3">
         <AppHeader />
       </div>
-      <main id="main" tabIndex={-1} className="page-container flex-1 py-6 focus:outline-none">
+      <main id="main" tabIndex={-1} className={`page-container flex-1 py-6 focus:outline-none${reveal ? " anim-reveal" : ""}`}>
         {children}
       </main>
       <SiteFooter />

@@ -21,8 +21,20 @@ const toneClass: Record<Tone, string> = {
   water: "px-btn-water",
 };
 
-export function Button({ tone = "leaf", className, ...rest }: ComponentProps<"button"> & { tone?: Tone }) {
-  return <button className={cx("px-btn", toneClass[tone], className)} {...rest} />;
+// `busy` disables the button and shows working dots; pair it with a label such as "Saving" for screen readers.
+export function Button({ tone = "leaf", busy, disabled, className, children, ...rest }: ComponentProps<"button"> & { tone?: Tone; busy?: boolean }) {
+  return (
+    <button className={cx("px-btn", toneClass[tone], className)} disabled={disabled || busy} aria-busy={busy || undefined} {...rest}>
+      {children}
+      {busy && (
+        <span className="busy-dots" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+      )}
+    </button>
+  );
 }
 
 export function ButtonLink({ tone = "leaf", className, ...rest }: ComponentProps<typeof Link> & { tone?: Tone }) {
@@ -162,7 +174,7 @@ export function ErrorState({ message, backHref, backLabel }: { message: string; 
 
 export function Loading({ label = "Loading the valley..." }: { label?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16" role="status">
+    <div className="anim-loader flex flex-col items-center justify-center gap-3 py-16" role="status">
       <span className="anim-bob">
         <Sprite grid={SPROUT} scale={5} />
       </span>
@@ -182,7 +194,7 @@ export function Meter({ value, max, color = "#3f9b4f", label }: { value: number;
       aria-valuenow={value}
       aria-label={label}
     >
-      <div className="h-full transition-[width] duration-500" style={{ width: `${pct}%`, background: color }} />
+      <div className="h-full transition-[width] duration-(--motion-slow) ease-(--motion-ease-out)" style={{ width: `${pct}%`, background: color }} />
     </div>
   );
 }

@@ -84,7 +84,7 @@ function ProfileBody({ data, onSaved }: { data: ProfileDto; onSaved: () => Promi
   );
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader title="Your gardener" description="Choose how classmates see you on the projector, and look back at your badges and harvests." />
       <div className="grid items-start gap-4 md:grid-cols-[300px_minmax(0,1fr)]">
         <Panel className="flex flex-col items-center text-center">
@@ -123,8 +123,8 @@ function ProfileBody({ data, onSaved }: { data: ProfileDto; onSaved: () => Promi
           {slotChoice("pet", "Companion")}
           <ErrorNote>{error}</ErrorNote>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t-2 border-parchment-dark pt-3">
-            <Button onClick={save} disabled={busy || !dirty}>
-              {busy ? "Saving..." : "Save changes"}
+            <Button onClick={save} busy={busy} disabled={!dirty}>
+              {busy ? "Saving" : "Save changes"}
             </Button>
             {dirty && (
               <button type="button" className="text-sm underline underline-offset-2" onClick={discard}>

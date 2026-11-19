@@ -7,6 +7,7 @@ import { SunTimer } from "@/components/garden/SunTimer";
 import { Avatar } from "@/components/pixel/Avatar";
 import { Sprite } from "@/components/pixel/Sprite";
 import { BASKET, BLOOM, CLOUD, SIGN, SPROUT, STAR, WILT } from "@/components/pixel/sprites";
+import { CountUp, useFlip } from "@/components/motion";
 import { ErrorNote, LanguageTag, Loading, Meter, Panel, Tag } from "@/components/ui";
 import { useApi } from "@/lib/client";
 import { serverOffset, useCountdown } from "@/lib/clock";
@@ -59,7 +60,7 @@ export function Projector({ sessionId }: { sessionId: string }) {
   const lobby = !round && session.status !== "closed";
 
   return (
-    <main className="flex min-h-screen flex-col gap-3 p-4 text-[17px]" style={{ background: "linear-gradient(#8fcbea 0, #bfe3f5 180px, #7cbf5a 180px)" }}>
+    <main className="anim-reveal flex min-h-screen flex-col gap-3 p-4 text-[17px]" style={{ background: "linear-gradient(#8fcbea 0, #bfe3f5 180px, #7cbf5a 180px)" }}>
       <header className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-3">
           <Sprite grid={BLOOM} scale={4} />
@@ -108,7 +109,7 @@ export function Projector({ sessionId }: { sessionId: string }) {
                     <p className="font-pixel text-xl">Harvest basket</p>
                     <Meter value={data.progress.placed} max={data.progress.dealt} color="#e9b949" label="Class progress" />
                     <p className="mt-1 text-sm">
-                      {data.progress.placed} of {data.progress.dealt} seeds planted by {session.participants} gardeners
+                      <CountUp value={data.progress.placed} /> of {data.progress.dealt} seeds planted by {session.participants} gardeners
                     </p>
                   </div>
                 </div>
@@ -204,21 +205,39 @@ function LobbyGate({ data }: { data: ProjectorState }) {
   );
 }
 
+// The projector only gets nicknames, so a repeated nickname is told apart by how often it has come up so far.
+function leaderKeys(top: ProjectorState["top"]) {
+  const seen = new Map<string, number>();
+  return top.map((p) => {
+    const n = (seen.get(p.nickname) ?? 0) + 1;
+    seen.set(p.nickname, n);
+    return n === 1 ? p.nickname : `${p.nickname}#${n}`;
+  });
+}
+
 function Noticeboard({ data }: { data: ProjectorState }) {
+  const list = useRef<HTMLOListElement>(null);
+  const keys = leaderKeys(data.top);
+  useFlip(list, keys.join("\n"));
   return (
     <section className="px-panel px-panel-wood p-4">
       <p className="font-pixel text-xl">Town noticeboard</p>
-      <ol className="mt-2 flex flex-col gap-2">
+      <ol ref={list} className="relative mt-2 flex flex-col gap-2">
         {data.top.length === 0 && <li className="text-sm">No points yet. Be the first to bloom!</li>}
         {data.top.map((p, i) => (
-          <li key={`${p.nickname}-${i}`} className="flex items-center gap-3 bg-parchment px-2 py-1 text-ink" style={{ boxShadow: "0 0 0 3px #5e3b26" }}>
+          <li
+            key={keys[i]}
+            data-flip={keys[i]}
+            className="flex items-center gap-3 bg-parchment px-2 py-1 text-ink"
+            style={{ boxShadow: "0 0 0 3px #5e3b26" }}
+          >
             <span className="w-6 font-pixel text-2xl">{i + 1}</span>
             <Avatar avatar={p.avatar} scale={2} />
             <span className="flex-1 truncate font-pixel text-xl">{p.nickname}</span>
             <Tag>Lv {p.level}</Tag>
             <span className="flex items-center gap-1 font-pixel text-xl">
               <Sprite grid={STAR} scale={2} />
-              {p.points.toLocaleString()}
+              <CountUp value={p.points} />
             </span>
           </li>
         ))}
@@ -240,7 +259,9 @@ function TeamsPanel({ data }: { data: ProjectorState }) {
               <span>
                 {t.name} <span className="font-normal">({t.members})</span>
               </span>
-              <span>{t.score.toLocaleString()}</span>
+              <span>
+                <CountUp value={t.score} />
+              </span>
             </div>
             <Meter value={t.score} max={best} color={t.color} label={`${t.name} average points`} />
           </li>

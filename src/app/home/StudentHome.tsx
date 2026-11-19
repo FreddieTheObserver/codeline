@@ -38,7 +38,7 @@ export function StudentHome() {
   const live = data.courses.filter((c) => c.live);
 
   return (
-    <PageShell>
+    <PageShell reveal>
       <PageHeader title={`Hi, ${data.viewer.nickname}`} description="Your courses, live Sessions and progress, all in one valley." />
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-4">
@@ -103,8 +103,8 @@ export function StudentHome() {
                   required
                 />
               </label>
-              <Button type="submit" disabled={joining || !code.trim()}>
-                {joining ? "Opening..." : "Join course"}
+              <Button type="submit" busy={joining} disabled={!code.trim()}>
+                {joining ? "Opening" : "Join course"}
               </Button>
             </form>
             <ErrorNote>{joinError}</ErrorNote>

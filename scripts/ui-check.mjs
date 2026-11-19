@@ -40,6 +40,8 @@ const liveNow = async () => (await (await api.get(`${BASE}/api/courses/${csc.id}
 await page.goto(`${BASE}/teach/courses/${csc.id}?tab=run`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Open the Lobby" }).click();
 await dialog().getByRole("button", { name: "Cancel" }).click();
+// Dialogs fade out before they leave the page.
+await dialog().waitFor({ state: "detached" });
 check("cancelling Open the Lobby creates no Session", (await liveNow()) === null);
 
 // Open, close, and come back: the setup must be usable again without a reload.
@@ -63,6 +65,7 @@ await page.goto(`${BASE}/teach`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "New course" }).click();
 check("New course dialog opens", await dialog().isVisible());
 await page.keyboard.press("Escape");
+await dialog().waitFor({ state: "detached", timeout: 2000 }).catch(() => {});
 check("Escape closes the dialog", (await dialog().count()) === 0);
 await page.getByRole("button", { name: "New course" }).click();
 await page.fill("input[placeholder=CSC102]:visible", "UI101");

@@ -203,8 +203,8 @@ export function SessionSetup({ detail, onCreated }: { detail: CourseDetail; onCr
       )}
       <ErrorNote>{error}</ErrorNote>
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t-2 border-parchment-dark pt-3">
-        <Button tone="sun" disabled={busy || rounds.length === 0} onClick={create}>
-          {busy ? "Opening the gate..." : "Open the Lobby"}
+        <Button tone="sun" busy={busy} disabled={rounds.length === 0} onClick={create}>
+          {busy ? "Opening the gate" : "Open the Lobby"}
         </Button>
         <span className="text-sm text-ink-soft">
           {rounds.length} {rounds.length === 1 ? "Round" : "Rounds"} · {rounds.reduce((t, r) => t + r.minutes, 0)} min in total
