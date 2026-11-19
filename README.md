@@ -60,6 +60,7 @@ bun scripts/smoke.ts            # end-to-end API test against a running server (
    | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key |
    | `SUPABASE_SECRET_KEY` | Secret key (server only) |
+   | `NEXT_PUBLIC_SITE_URL` | `https://codeline.layaungphyo.dev`, the address join links and QR codes use |
 
    `vercel.json` pins the functions to Singapore, next to the database.
 4. Add `codeline.layaungphyo.dev` under the project's Domains, then create the `codeline` CNAME record with the target Vercel shows.
@@ -73,4 +74,5 @@ node scripts/build-pdf.mjs ../codeline-deliverables/screens ../codeline-delivera
 ```
 
 The capture script needs freshly seeded data and walks every business process through the real app.
+Start the server with `NEXT_PUBLIC_SITE_URL=https://codeline.layaungphyo.dev`, so the projector's join link and QR code show the live address rather than localhost.
 `scripts/demo-live.ts` opens a live CSC101 Session with simulated classmates for a quick demo.

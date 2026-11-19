@@ -7,7 +7,9 @@ export function JoinQr({ code, size = 220, caption = true }: { code: string; siz
   const [src, setSrc] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   useEffect(() => {
-    const target = `${window.location.origin}/join/${code}`;
+    // A set public address wins over whichever host happened to open this page, so every QR code points at the same site.
+    const origin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || window.location.origin;
+    const target = `${origin}/join/${code}`;
     QRCode.toDataURL(target, { margin: 1, width: size * 2, color: { dark: "#3b2a1e", light: "#fbf3df" } })
       .then((dataUrl) => {
         setSrc(dataUrl);
