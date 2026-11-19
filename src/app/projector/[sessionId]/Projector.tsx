@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Board, type PlotView } from "@/components/garden/Board";
 import { JoinQr } from "@/components/garden/JoinQr";
 import { SunTimer } from "@/components/garden/SunTimer";
@@ -83,6 +83,7 @@ export function Projector({ sessionId }: { sessionId: string }) {
           <button onClick={() => setSound(!sound)} className="px-btn px-btn-secondary !px-2 !py-1 text-xs" aria-pressed={sound}>
             Sound {sound ? "on" : "off"}
           </button>
+          <FullscreenButton />
         </div>
       </header>
 
@@ -143,34 +144,60 @@ export function Projector({ sessionId }: { sessionId: string }) {
   );
 }
 
+function subscribeFullscreen(onChange: () => void) {
+  document.addEventListener("fullscreenchange", onChange);
+  return () => document.removeEventListener("fullscreenchange", onChange);
+}
+const subscribeNever = () => () => {};
+
+// Hidden where the page can't go fullscreen, such as Safari on iPhone.
+function FullscreenButton() {
+  const supported = useSyncExternalStore(subscribeNever, () => document.fullscreenEnabled, () => false);
+  const on = useSyncExternalStore(subscribeFullscreen, () => document.fullscreenElement !== null, () => false);
+  if (!supported) return null;
+  const toggle = () => void (on ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+  return (
+    <button type="button" onClick={toggle} className="px-btn px-btn-secondary !px-2 !py-1 text-xs">
+      {on ? "Exit fullscreen" : "Fullscreen"}
+    </button>
+  );
+}
+
+// The lobby fills the screen: the QR code grows with the room's screen so the back row can still scan it.
+const QR_SIZE = "clamp(220px, min(100dvh - 27rem, 42vw), 960px)";
+
 function LobbyGate({ data }: { data: ProjectorState }) {
   return (
-    <div className="grid flex-1 items-start gap-4 lg:grid-cols-[auto_1fr]">
-      <Panel className="flex flex-col items-center gap-3 p-6">
-        <p className="font-pixel text-2xl">Scan to join</p>
-        <JoinQr code={data.session.joinCode} size={260} />
-        <p className="text-center">or enter the join code</p>
-        <p className="font-mono text-5xl tracking-[0.3em]">{data.session.joinCode}</p>
+    <div className="grid flex-1 gap-4 lg:grid-cols-[auto_minmax(0,1fr)]">
+      <Panel className="flex flex-col items-center justify-center gap-3 p-6">
+        <p className="font-pixel text-4xl">Scan to join</p>
+        <JoinQr code={data.session.joinCode} size={QR_SIZE} captionClassName="text-xl" />
+        <p className="text-center text-xl">or enter the join code</p>
+        <p className="pl-[0.3em] font-mono text-[clamp(3rem,6vw,7rem)] leading-none tracking-[0.3em]">{data.session.joinCode}</p>
       </Panel>
-      <Panel className="relative min-h-[420px] overflow-hidden">
+      <Panel className="relative flex min-h-[420px] flex-col overflow-hidden p-6">
         <div className="absolute right-6 top-4 opacity-70">
           <Sprite grid={CLOUD} scale={6} />
         </div>
-        <p className="font-pixel text-4xl">The gate is open</p>
-        <p className="mt-1 text-lg">
+        <p className="font-pixel text-5xl">The gate is open</p>
+        <p className="mt-2 text-2xl">
           {data.session.participants} {data.session.participants === 1 ? "gardener has" : "gardeners have"} arrived. The first Round starts soon.
         </p>
         <ul className="mt-6 flex flex-wrap gap-3">
           {data.lobbyNames.map((n, i) => (
-            <li key={`${n}-${i}`} className="anim-sprout flex items-center gap-1 bg-parchment-dark px-2 py-1 font-pixel" style={{ boxShadow: "0 0 0 3px #3b2a1e", animationDelay: `${(i % 12) * 40}ms` }}>
+            <li
+              key={`${n}-${i}`}
+              className="anim-sprout flex items-center gap-[0.3em] bg-parchment-dark px-[0.5em] py-[0.2em] font-pixel text-[clamp(1rem,1.25vw,1.5rem)]"
+              style={{ boxShadow: "0 0 0 3px #3b2a1e", animationDelay: `${(i % 12) * 40}ms` }}
+            >
               <Sprite grid={SPROUT} scale={2} />
               {n}
             </li>
           ))}
         </ul>
-        <div className="absolute bottom-4 left-6 flex items-end gap-3">
+        <div className="mt-auto flex items-end gap-3 pt-6">
           <Sprite grid={SIGN} scale={5} />
-          <p className="max-w-md text-sm">Read each signpost: it is one step of the algorithm in plain words. Plant your seed in the plot where its code belongs.</p>
+          <p className="max-w-xl text-lg">Read each signpost: it is one step of the algorithm in plain words. Plant your seed in the plot where its code belongs.</p>
         </div>
       </Panel>
     </div>
