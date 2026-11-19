@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import useSWR, { type SWRConfiguration } from "swr";
 
 export class ApiError extends Error {
@@ -53,7 +54,16 @@ export function del<T = { ok: true }>(path: string): Promise<T> {
 }
 
 export function useApi<T>(path: string | null, config?: SWRConfiguration<T, ApiError>) {
-  return useSWR<T, ApiError>(path, (p: string) => api<T>(p), { revalidateOnFocus: true, ...config });
+  const result = useSWR<T, ApiError>(path, (p: string) => api<T>(p), { revalidateOnFocus: true, ...config });
+  const { mutate } = result;
+  const shownBefore = useRef(false);
+  // Next.js keeps recently visited pages alive but hidden, and re-runs their effects when one is shown again.
+  // SWR doesn't reliably refetch then, so a returning page could show data from when the user left it.
+  useEffect(() => {
+    if (shownBefore.current) void mutate();
+    shownBefore.current = true;
+  }, [mutate]);
+  return result;
 }
 
 export function errorText(err: unknown): string {
