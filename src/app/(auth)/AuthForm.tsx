@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { mutate } from "swr";
-import { useToast } from "@/components/feedback";
+import { flashToast } from "@/components/feedback";
 import { homeFor } from "@/components/nav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Button, ErrorNote, Field, Panel, Title } from "@/components/ui";
@@ -19,8 +17,6 @@ function destination(viewer: Viewer): string {
 }
 
 export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
-  const router = useRouter();
-  const toast = useToast();
   const [loginId, setLoginId] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -36,11 +32,14 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
         mode === "signup"
           ? await post<Viewer>("/api/auth/signup", { loginId, name, password })
           : await post<Viewer>("/api/auth/signin", { loginId, password });
-      // Every header, footer and landing button reads this key, so it must change before the next page renders.
-      await mutate("/api/me", { viewer }, { revalidate: false });
-      toast(mode === "signup" ? `Welcome to the valley, ${viewer.nickname}!` : `Welcome back, ${viewer.nickname}.`);
-      router.push(destination(viewer));
-      router.refresh();
+      flashToast(mode === "signup" ? `Welcome to the valley, ${viewer.nickname}!` : `Welcome back, ${viewer.nickname}.`);
+      // Cleared first in case the browser later restores this page from its back/forward cache.
+      setLoginId("");
+      setName("");
+      setPassword("");
+      setBusy(false);
+      // A full page load: nothing kept from before the sign-in, by Next.js or by the data cache, carries into the new account.
+      window.location.assign(destination(viewer));
     } catch (err) {
       setError(errorText(err));
       setBusy(false);

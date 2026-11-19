@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Suspense } from "react";
-import { mutate } from "swr";
-import { post, useApi } from "@/lib/client";
+import { errorText, post, useApi } from "@/lib/client";
+import { hasUnsavedChanges, setLeaving } from "@/lib/leaving";
 import type { Viewer } from "@/lib/api-types";
-import { useToast } from "./feedback";
+import { flashToast, useConfirm, useToast } from "./feedback";
 import { homeFor, isActive, navFor, roleLabel, type NavLink } from "./nav";
 import { Sprite } from "./pixel/Sprite";
 import { BLOOM } from "./pixel/sprites";
@@ -42,20 +42,36 @@ function ActiveNav({ links }: { links: NavLink[] }) {
 }
 
 export function AppHeader() {
-  const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const { data } = useApi<{ viewer: Viewer | null }>("/api/me");
   const viewer = data?.viewer ?? null;
   const links = navFor(viewer);
 
   async function signOut() {
-    await post("/api/auth/signout");
-    // Drop every cached response, so the next person on this device never sees the last one's data.
-    await mutate(() => true, undefined, { revalidate: false });
-    await mutate("/api/me", { viewer: null }, { revalidate: false });
-    toast("You signed out. See you in the next Session.");
-    router.push("/");
-    router.refresh();
+    if (hasUnsavedChanges()) {
+      const ok = await confirm({
+        title: "Sign out without saving?",
+        body: "This page has changes that aren't saved yet.",
+        confirmLabel: "Sign out without saving",
+        cancelLabel: "Keep editing",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    setLeaving(true);
+    try {
+      await post("/api/auth/signout");
+    } catch (err) {
+      setLeaving(false);
+      toast(`Couldn't sign out: ${errorText(err)}`, "error");
+      return;
+    }
+    flashToast("You signed out. See you in the next Session.");
+    // A full page load, not a client navigation: Next.js keeps recently visited pages alive but hidden,
+    // and on a shared classroom computer none of them, nor any cached data, may outlive the sign-out.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign("/");
   }
 
   return (

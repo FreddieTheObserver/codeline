@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { isLeaving, trackUnsaved } from "@/lib/leaving";
 import { useConfirm } from "./feedback";
 
 // While there are unsaved changes, asks before a reload, a tab close, or a click on any in-app link.
@@ -11,7 +12,10 @@ export function useLeaveGuard(dirty: boolean, what: string) {
 
   useEffect(() => {
     if (!dirty) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    const untrack = trackUnsaved({});
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isLeaving()) e.preventDefault();
+    };
     // Capture phase, so this runs before next/link's own click handler.
     const onClick = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -35,6 +39,7 @@ export function useLeaveGuard(dirty: boolean, what: string) {
     window.addEventListener("beforeunload", onBeforeUnload);
     document.addEventListener("click", onClick, true);
     return () => {
+      untrack();
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("click", onClick, true);
     };

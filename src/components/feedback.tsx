@@ -40,6 +40,15 @@ type Feedback = {
 
 const FeedbackContext = createContext<Feedback | null>(null);
 
+const FLASH_KEY = "codeline-flash";
+
+// For actions that end in a full page load, such as signing in or out: the message waits for the next page.
+export function flashToast(text: string) {
+  try {
+    window.sessionStorage.setItem(FLASH_KEY, text);
+  } catch {}
+}
+
 function settle(request: Request) {
   if (request.kind === "confirm") request.resolve(false);
   else request.resolve(null);
@@ -71,6 +80,15 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
     setToasts((list) => [...list.slice(-2), { id, text, tone }]);
     window.setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 4500);
   }, []);
+
+  useEffect(() => {
+    let text: string | null = null;
+    try {
+      text = window.sessionStorage.getItem(FLASH_KEY);
+      window.sessionStorage.removeItem(FLASH_KEY);
+    } catch {}
+    if (text) toast(text);
+  }, [toast]);
 
   const finish = (r: Request, value: boolean | string | null) => {
     current.current = null;

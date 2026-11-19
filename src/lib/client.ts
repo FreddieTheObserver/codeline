@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import useSWR, { type SWRConfiguration } from "swr";
+import { isLeaving } from "./leaving";
 
 export class ApiError extends Error {
   constructor(
@@ -27,7 +28,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const message = (data as { error?: string } | null)?.error ?? `Request failed (${res.status}).`;
-    if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth")) {
+    if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth") && !isLeaving()) {
       // A full reload on an expired sign-in also clears any stale client state.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = `/signin?next=${encodeURIComponent(window.location.pathname)}`;
