@@ -21,13 +21,17 @@ const ROUND_STATUS: Record<RoundStatus, { label: string; color: string }> = {
   revealed: { label: "revealed", color: "#a4d77e" },
 };
 
+// Kept outside the component on purpose: SWR restarts its poll timer whenever this option changes identity,
+// and the countdown re-renders the console every 250 ms, so an inline function would never let a poll fire.
+const pollUntilClosed = (latest: ConsoleState | undefined) => (latest?.session.status === "closed" ? 0 : 1500);
+
 export function Console({ sessionId }: { sessionId: string }) {
   const confirm = useConfirm();
   const prompt = usePrompt();
   const toast = useToast();
   const [offset, setOffset] = useState(0);
   const { data, error, mutate } = useApi<ConsoleState>(`/api/sessions/${sessionId}/console`, {
-    refreshInterval: (latest) => (latest?.session.status === "closed" ? 0 : 1500),
+    refreshInterval: pollUntilClosed,
     onSuccess: (d) => setOffset(serverOffset(d.serverNow, Date.now())),
   });
   const [actionError, setActionError] = useState("");
