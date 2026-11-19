@@ -76,6 +76,90 @@ export function ErrorNote({ children }: { children: ReactNode }) {
   );
 }
 
+export type Crumb = { label: string; href?: string };
+
+export function Breadcrumbs({ items }: { items: Crumb[] }) {
+  return (
+    <nav aria-label="Breadcrumb" className="mb-1 text-sm">
+      <ol className="flex flex-wrap items-center gap-x-1.5">
+        {items.map((c, i) => (
+          <li key={`${c.label}-${i}`} className="flex items-center gap-x-1.5">
+            {i > 0 && <span aria-hidden="true" className="text-ink-soft">/</span>}
+            {c.href ? (
+              <Link href={c.href} className="underline underline-offset-2 hover:text-leaf-dark">
+                {c.label}
+              </Link>
+            ) : (
+              <span aria-current="page" className="font-bold">
+                {c.label}
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+// The title row every signed-in page starts with: breadcrumbs, title and description on the left, page actions on the right.
+export function PageHeader({
+  title,
+  description,
+  breadcrumbs,
+  actions,
+  tags,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  breadcrumbs?: Crumb[];
+  actions?: ReactNode;
+  tags?: ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+      <div className="min-w-0">
+        {breadcrumbs && <Breadcrumbs items={breadcrumbs} />}
+        {tags && <div className="mb-1 flex flex-wrap items-center gap-2">{tags}</div>}
+        <Title>{title}</Title>
+        {description && <p className="mt-1 max-w-3xl">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-1">{actions}</div>}
+    </div>
+  );
+}
+
+export function Stat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <Panel className="text-center">
+      <p className="font-pixel text-3xl">{value}</p>
+      <p className="text-sm">{label}</p>
+    </Panel>
+  );
+}
+
+export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+      <Sprite grid={SPROUT} scale={4} />
+      <p className="font-pixel text-lg">{title}</p>
+      {children && <p className="max-w-md text-sm">{children}</p>}
+      {action}
+    </div>
+  );
+}
+
+export function ErrorState({ message, backHref, backLabel }: { message: string; backHref: string; backLabel: string }) {
+  return (
+    <Panel className="mx-auto max-w-xl">
+      <Heading>Something went wrong</Heading>
+      <ErrorNote>{message}</ErrorNote>
+      <ButtonLink href={backHref} tone="secondary">
+        {backLabel}
+      </ButtonLink>
+    </Panel>
+  );
+}
+
 export function Loading({ label = "Loading the valley..." }: { label?: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16" role="status">
@@ -91,8 +175,7 @@ export function Meter({ value, max, color = "#3f9b4f", label }: { value: number;
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div
-      className="h-4 w-full bg-parchment-dark"
-      style={{ boxShadow: "0 0 0 3px #3b2a1e" }}
+      className="h-5 w-full border-[3px] border-ink bg-parchment-dark"
       role="meter"
       aria-valuemin={0}
       aria-valuemax={max}

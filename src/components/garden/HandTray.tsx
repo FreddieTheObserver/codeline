@@ -24,9 +24,9 @@ export function HandTray({
     <div className="sticky bottom-0 z-20 mt-4">
       <div className="px-panel px-panel-wood !mx-1 !mb-1 p-3">
         {children}
-        <div className="mb-2 flex items-center justify-between gap-2 font-pixel">
-          <span>Seed pouch</span>
-          <span className="text-sm">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 font-pixel">
+          <span className="whitespace-nowrap">Seed pouch</span>
+          <span className="text-xs sm:text-sm">
             {left.length === 0 ? "All planted!" : `${left.length} of ${cards.length} left · tap a seed, then a plot`}
           </span>
         </div>

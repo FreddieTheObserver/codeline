@@ -159,6 +159,40 @@ body {
   image-rendering: pixelated;
 }
 
+/* Header, main and footer share this box, so their edges line up on every page. */
+@utility page-container {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 80rem;
+  padding-inline: 16px;
+  @media (width >= 40rem) {
+    padding-inline: 24px;
+  }
+}
+
+/* A list row inside a panel. A real border, not a shadow ring, so it lines up with the panel's text. */
+@utility px-row {
+  background-color: rgb(236 220 182 / 0.5);
+  border: 2px solid #c9b48a;
+}
+
+@utility px-dialog {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  width: min(32rem, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  color: var(--color-ink);
+  &::backdrop {
+    background: rgb(59 42 30 / 0.55);
+  }
+  &[open] {
+    animation: dialog-in 140ms ease-out;
+  }
+}
+
 /* Soil plot: a tilled tile with furrows. */
 @utility plot {
   background-color: var(--plot-fill, var(--color-soil));
@@ -195,6 +229,15 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
 }
+@keyframes dialog-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes toast-in {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.anim-toast { animation: toast-in 180ms ease-out both; }
 .anim-sprout { animation: sprout-pop 420ms ease-out both; }
 .anim-wilt { animation: wilt-shake 420ms ease-in-out; }
 .anim-float { animation: float-up 1100ms ease-out forwards; }

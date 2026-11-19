@@ -830,6 +830,7 @@ export async function consoleState(viewer: Viewer, sessionId: string): Promise<C
         roundIndex: s.currentRound,
         roundCount: all.length,
         participants: list.length,
+        courseId: course.id,
         handSize: s.handSize,
         teamCount: s.teamCount,
         rounds: all.map((a) => ({ position: a.r.position, exerciseTitle: a.title, timeLimitS: a.r.timeLimitS, status: a.r.status })),

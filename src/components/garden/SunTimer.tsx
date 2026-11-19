@@ -11,7 +11,7 @@ export function SunTimer({ timer, left, big }: { timer: TimerDto | null; left: n
   const status = timer?.status;
   return (
     <div
-      className={`relative w-full overflow-hidden ${big ? "h-20" : "h-12"}`}
+      className={`relative m-1 w-[calc(100%-8px)] overflow-hidden ${big ? "h-20" : "h-12"}`}
       style={{
         background: dusk ? "linear-gradient(#f2a65a, #f6c98a)" : "linear-gradient(#8fcbea, #bfe3f5)",
         boxShadow: "0 0 0 4px #3b2a1e",

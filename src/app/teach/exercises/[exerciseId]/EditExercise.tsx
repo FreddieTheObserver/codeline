@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { PageShell } from "@/components/AppHeader";
-import { ErrorNote, Loading } from "@/components/ui";
+import { PageShell } from "@/components/PageShell";
+import { ErrorState, Loading } from "@/components/ui";
 import { useApi } from "@/lib/client";
 import type { ExerciseDto } from "@/lib/api-types";
 import { ExerciseEditor } from "../../ExerciseEditor";
@@ -10,7 +10,7 @@ import { ExerciseEditor } from "../../ExerciseEditor";
 export function EditExercise({ exerciseId }: { exerciseId: string }) {
   const { data, error, mutate } = useApi<ExerciseDto>(`/api/exercises/${exerciseId}`, { revalidateOnFocus: false });
   const [version, setVersion] = useState(0);
-  if (error) return <PageShell><ErrorNote>{error.message}</ErrorNote></PageShell>;
+  if (error) return <PageShell><ErrorState message={error.message} backHref="/teach" backLabel="Back to my courses" /></PageShell>;
   if (!data) return <PageShell><Loading /></PageShell>;
   return (
     <ExerciseEditor

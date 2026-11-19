@@ -42,7 +42,7 @@ export function Board({ plots, armed, flash, onPlot, onDropCard, big }: Props) {
         const classStage = stageFor(p);
         return (
           <li key={p.id} className="grid gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
-            <div className={cx("flex items-start gap-2 bg-wood px-3 py-2 text-parchment", big ? "text-xl" : "text-sm")} style={{ boxShadow: "0 0 0 3px #5e3b26" }}>
+            <div className={cx("m-[3px] flex items-start gap-2 bg-wood px-3 py-2 text-parchment", big ? "text-xl" : "text-sm")} style={{ boxShadow: "0 0 0 3px #5e3b26" }}>
               <span className="font-pixel opacity-80">{p.position + 1}</span>
               <span className="font-bold" style={{ paddingLeft: `${p.indent * 0.75}rem` }}>
                 {p.pseudocode || <span className="italic opacity-70">(structure)</span>}

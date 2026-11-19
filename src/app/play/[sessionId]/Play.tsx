@@ -1,16 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { mutate as refresh } from "swr";
-import { AppHeader } from "@/components/AppHeader";
 import { Board, type PlotView } from "@/components/garden/Board";
 import { HandTray } from "@/components/garden/HandTray";
+import { PageShell } from "@/components/PageShell";
 import { SunTimer } from "@/components/garden/SunTimer";
 import { Avatar } from "@/components/pixel/Avatar";
 import { Sprite } from "@/components/pixel/Sprite";
 import { BADGE_ICONS, BASKET, BLOOM, SPROUT, STAR, WILT } from "@/components/pixel/sprites";
-import { Button, ButtonLink, ErrorNote, LanguageTag, Loading, Panel, Tag } from "@/components/ui";
+import { Button, ButtonLink, ErrorNote, ErrorState, LanguageTag, Loading, Panel, Tag } from "@/components/ui";
 import { errorText, post, useApi } from "@/lib/client";
 import { serverOffset, useCountdown } from "@/lib/clock";
 import { useSessionPush } from "@/lib/realtime";
@@ -159,20 +158,8 @@ export function Play({ sessionId }: { sessionId: string }) {
     }
   }
 
-  if (error) {
-    return (
-      <>
-        <AppHeader />
-        <main className="mx-auto max-w-3xl p-4">
-          <ErrorNote>{error.message}</ErrorNote>
-          <ButtonLink href="/home" tone="secondary">
-            Back to the valley
-          </ButtonLink>
-        </main>
-      </>
-    );
-  }
-  if (!data) return <Loading label="Walking to the garden..." />;
+  if (error) return <PageShell><ErrorState message={error.message} backHref="/home" backLabel="Back to your valley" /></PageShell>;
+  if (!data) return <PageShell><Loading label="Walking to the garden..." /></PageShell>;
 
   const { session, me } = data;
   const status = round?.timer.status;
@@ -218,11 +205,10 @@ export function Play({ sessionId }: { sessionId: string }) {
   );
 
   return (
-    <>
-      <AppHeader />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-3 pb-6 pt-4">
+    <PageShell>
+      <div className="flex flex-col gap-3">
         <Panel className="flex flex-wrap items-center gap-x-6 gap-y-2 !py-2">
-          <div className="flex-1">
+          <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
             <p className="font-pixel text-sm">
               {session.courseCode} · Round {Math.max(1, session.roundIndex + 1)} of {session.roundCount}
             </p>
@@ -236,8 +222,8 @@ export function Play({ sessionId }: { sessionId: string }) {
               {me.team.name} · {me.team.score.toLocaleString()}
             </Tag>
           )}
-          <div className="text-right">
-            <p className="flex items-center justify-end gap-1 font-pixel text-2xl">
+          <div className="sm:text-right">
+            <p className="flex items-center gap-1 font-pixel text-2xl sm:justify-end">
               <Sprite grid={STAR} scale={2} />
               {me.points.toLocaleString()}
             </p>
@@ -248,7 +234,7 @@ export function Play({ sessionId }: { sessionId: string }) {
           <button
             type="button"
             onClick={() => setSound(!sound)}
-            className="px-btn px-btn-secondary !px-2 !py-1 text-xs"
+            className="px-btn px-btn-secondary ml-auto !px-2 !py-1 text-xs sm:ml-1"
             aria-pressed={sound}
           >
             Sound {sound ? "on" : "off"}
@@ -266,7 +252,7 @@ export function Play({ sessionId }: { sessionId: string }) {
                 </span>
               </span>
             ))}
-            <button className="ml-auto text-sm underline" onClick={() => setNewBadges([])}>
+            <button type="button" className="ml-auto text-sm underline" onClick={() => setNewBadges([])}>
               Nice
             </button>
           </Panel>
@@ -277,7 +263,7 @@ export function Play({ sessionId }: { sessionId: string }) {
         ) : !round ? (
           <LobbyView nickname={me.nickname} count={me.of} />
         ) : (
-          <div className="mt-3 flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             <SunTimer timer={round.timer} left={left} />
             {status === "paused" && (
               <Panel className="text-center font-pixel text-xl" role="status">
@@ -313,14 +299,14 @@ export function Play({ sessionId }: { sessionId: string }) {
             ) : null}
           </div>
         )}
-      </main>
-    </>
+      </div>
+    </PageShell>
   );
 }
 
 function LobbyView({ nickname, count }: { nickname: string; count: number }) {
   return (
-    <Panel className="mt-4 flex flex-col items-center gap-3 py-10 text-center">
+    <Panel className="flex flex-col items-center gap-3 py-10 text-center">
       <span className="anim-bob">
         <Avatar scale={7} />
       </span>
@@ -362,7 +348,7 @@ function ResultView({ result, revealed }: { result: NonNullable<StudentState["re
 
 function ClosedView({ points, rank, of }: { points: number; rank: number | null; of: number }) {
   return (
-    <Panel className="mt-4 flex flex-col items-center gap-3 py-10 text-center">
+    <Panel className="flex flex-col items-center gap-3 py-10 text-center">
       <Sprite grid={BASKET} scale={7} />
       <p className="font-pixel text-3xl">The Session is over</p>
       <p>
@@ -374,9 +360,6 @@ function ClosedView({ points, rank, of }: { points: number; rank: number | null;
           See your almanac
         </ButtonLink>
       </div>
-      <Link href="/home" className="sr-only">
-        Home
-      </Link>
     </Panel>
   );
 }

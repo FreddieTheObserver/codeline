@@ -1,120 +1,169 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { PageShell } from "@/components/AppHeader";
+import { Modal, useToast } from "@/components/feedback";
+import { PageShell } from "@/components/PageShell";
 import { Sprite } from "@/components/pixel/Sprite";
 import { SPROUT, TREE } from "@/components/pixel/sprites";
-import { Button, ButtonLink, ErrorNote, Field, Heading, LanguageTag, Loading, Panel, SampleTag, Title } from "@/components/ui";
+import { Button, ButtonLink, EmptyState, ErrorNote, ErrorState, Field, LanguageTag, Loading, PageHeader, Panel, SampleTag } from "@/components/ui";
 import { errorText, post, useApi } from "@/lib/client";
 import { LANGUAGES } from "@/domain/exercise-text";
 import type { StaffCourseCard, Viewer } from "@/lib/api-types";
 
 export function TeachHome() {
-  const router = useRouter();
   const { data, error } = useApi<{ viewer: Viewer; courses: StaffCourseCard[] }>("/api/teach", { refreshInterval: 10000 });
-  const [form, setForm] = useState({ code: "", title: "", language: "java" });
-  const [formError, setFormError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setFormError("");
-    try {
-      const { id } = await post<{ id: string }>("/api/teach", form);
-      router.push(`/teach/courses/${id}`);
-    } catch (err) {
-      setFormError(errorText(err));
-      setBusy(false);
-    }
-  }
-
-  if (error) return <PageShell><ErrorNote>{error.message}</ErrorNote></PageShell>;
+  if (error) return <PageShell><ErrorState message={error.message} backHref="/" backLabel="Back to the start" /></PageShell>;
   if (!data) return <PageShell><Loading /></PageShell>;
   const isLecturer = data.viewer.role === "lecturer";
 
   return (
     <PageShell>
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <Title>{isLecturer ? "My courses" : "Courses I assist"}</Title>
-          <p className="text-ink">{isLecturer ? "Prepare Exercises, run live Sessions and follow each student's progress." : "Run Sessions for the courses you assist. The overview covers every course."}</p>
-        </div>
-        {!isLecturer && <ButtonLink href="/ta">Department overview</ButtonLink>}
-      </div>
+      <PageHeader
+        title={isLecturer ? "My courses" : "Courses I assist"}
+        description={
+          isLecturer
+            ? "Prepare Exercises, run live Sessions and follow each student's progress."
+            : "Run Sessions for the courses you assist. The department overview covers every course."
+        }
+        actions={
+          isLecturer ? (
+            <Button onClick={() => setCreating(true)}>New course</Button>
+          ) : (
+            <ButtonLink href="/ta" tone="secondary">
+              Department overview
+            </ButtonLink>
+          )
+        }
+      />
 
-      <ul className="mt-4 grid gap-4 md:grid-cols-2">
-        {data.courses.length === 0 && (
-          <li>
-            <Panel>{isLecturer ? "No courses yet. Create your first one below." : "You aren't assisting any course yet."}</Panel>
-          </li>
-        )}
-        {data.courses.map((c) => (
-          <li key={c.id}>
-            <Panel className="relative h-full overflow-hidden">
-              <div className="absolute -right-3 -top-2 opacity-80">
-                <Sprite grid={TREE} scale={5} />
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <LanguageTag language={c.language} />
-                {c.isSample && <SampleTag />}
-              </div>
-              <p className="mt-2 font-pixel text-3xl">{c.code}</p>
-              <p className="font-bold">{c.title}</p>
-              <p className="mt-1 text-sm">
-                {c.enrolled} students · {c.exercises} Exercises · join code <span className="font-mono font-bold tracking-widest">{c.joinCode}</span>
-              </p>
-              <div className="mt-3 flex flex-wrap gap-1">
-                <ButtonLink href={`/teach/courses/${c.id}`}>Open course</ButtonLink>
-                {c.live && (
-                  <ButtonLink href={`/console/${c.live.sessionId}`} tone="sun">
-                    <span className="inline-flex items-center gap-2">
-                      <Sprite grid={SPROUT} scale={2} /> Live console
-                    </span>
-                  </ButtonLink>
-                )}
-              </div>
-            </Panel>
-          </li>
-        ))}
-      </ul>
-
-      {isLecturer && (
-        <Panel className="mt-6 max-w-2xl">
-          <Heading>Create a course</Heading>
-          <p className="text-sm">Any programming course the department offers, in any language.</p>
-          <form onSubmit={create} className="mt-3 grid gap-3 sm:grid-cols-[140px_1fr_160px]">
-            <Field label="Code">
-              <input className="px-input uppercase" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="CSC102" required />
-            </Field>
-            <Field label="Title">
-              <input className="px-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Data Structures" required />
-            </Field>
-            <Field label="Main language">
-              <select className="px-input" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
-                {LANGUAGES.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <div className="sm:col-span-3">
-              <ErrorNote>{formError}</ErrorNote>
-              <Button type="submit" disabled={busy}>
-                {busy ? "Creating..." : "Create course"}
-              </Button>
-            </div>
-          </form>
+      {data.courses.length === 0 ? (
+        <Panel>
+          <EmptyState
+            title={isLecturer ? "No courses yet" : "No courses to assist yet"}
+            action={isLecturer ? <Button onClick={() => setCreating(true)}>Create your first course</Button> : undefined}
+          >
+            {isLecturer ? "A course holds its Exercises, its enrolled students and its Sessions." : "A lecturer adds you to a course they want help running."}
+          </EmptyState>
         </Panel>
+      ) : (
+        <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {data.courses.map((c) => (
+            <li key={c.id} className="flex">
+              <CourseCardView course={c} />
+            </li>
+          ))}
+        </ul>
       )}
-      <p className="mt-6 text-sm">
-        <Link href="/about" className="underline">
-          About CodeLine
-        </Link>
-      </p>
+
+      {creating && <CreateCourseDialog onClose={() => setCreating(false)} />}
     </PageShell>
+  );
+}
+
+function CourseCardView({ course: c }: { course: StaffCourseCard }) {
+  return (
+    <Panel className="relative flex w-full flex-col overflow-hidden">
+      <div className="absolute -right-3 -top-2 opacity-80" aria-hidden="true">
+        <Sprite grid={TREE} scale={5} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <LanguageTag language={c.language} />
+        {c.isSample && <SampleTag />}
+      </div>
+      <p className="mt-2 font-pixel text-3xl">{c.code}</p>
+      <p className="font-bold">{c.title}</p>
+      <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+        <div className="px-row p-1">
+          <dt>Students</dt>
+          <dd className="font-pixel text-lg">{c.enrolled}</dd>
+        </div>
+        <div className="px-row p-1">
+          <dt>Exercises</dt>
+          <dd className="font-pixel text-lg">{c.exercises}</dd>
+        </div>
+        <div className="px-row p-1">
+          <dt>Join code</dt>
+          <dd className="font-mono text-base font-bold leading-7 tracking-wider">{c.joinCode}</dd>
+        </div>
+      </dl>
+      <div className="mt-auto flex flex-wrap gap-1 pt-3">
+        <ButtonLink href={`/teach/courses/${c.id}`}>Open course</ButtonLink>
+        {c.live && (
+          <ButtonLink href={`/console/${c.live.sessionId}`} tone="sun">
+            <span className="inline-flex items-center gap-2">
+              <Sprite grid={SPROUT} scale={2} /> Live console
+            </span>
+          </ButtonLink>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function CreateCourseDialog({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [form, setForm] = useState({ code: "", title: "", language: "java" });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { id } = await post<{ id: string }>("/api/teach", form);
+      toast(`${form.code.toUpperCase()} is ready. Add its first Exercise next.`);
+      router.push(`/teach/courses/${id}`);
+    } catch (err) {
+      setError(errorText(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Create a course" onClose={onClose}>
+      <p className="mt-1 text-sm">Any programming course the department offers, in any language. Students enrol with the join code CodeLine creates for it.</p>
+      <form onSubmit={create} className="mt-3 grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)]">
+        <Field label="Code">
+          <input
+            className="px-input uppercase"
+            value={form.code}
+            onChange={(e) => setForm({ ...form, code: e.target.value })}
+            placeholder="CSC102"
+            required
+            data-autofocus=""
+          />
+        </Field>
+        <Field label="Title">
+          <input className="px-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Data Structures" required />
+        </Field>
+        <div className="sm:col-span-2">
+          <Field label="Main language">
+            <select className="px-input" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
+              {LANGUAGES.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <ErrorNote>{error}</ErrorNote>
+          <div className="mt-2 flex flex-wrap justify-end gap-1">
+            <Button type="button" tone="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? "Creating..." : "Create course"}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </Modal>
   );
 }

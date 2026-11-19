@@ -3,7 +3,7 @@
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 
-export function JoinQr({ code, size = 220 }: { code: string; size?: number }) {
+export function JoinQr({ code, size = 220, caption = true }: { code: string; size?: number; caption?: boolean }) {
   const [src, setSrc] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -23,7 +23,7 @@ export function JoinQr({ code, size = 220 }: { code: string; size?: number }) {
       ) : (
         <div style={{ width: size, height: size }} />
       )}
-      <figcaption className="text-center text-sm break-all">{url.replace(/^https?:\/\//, "")}</figcaption>
+      {caption && <figcaption className="text-center text-sm break-all">{url.replace(/^https?:\/\//, "")}</figcaption>}
     </figure>
   );
 }

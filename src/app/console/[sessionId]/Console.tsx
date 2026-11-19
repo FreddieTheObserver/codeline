@@ -1,18 +1,30 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PageShell } from "@/components/AppHeader";
+import { useConfirm, usePrompt, useToast } from "@/components/feedback";
 import { SunTimer } from "@/components/garden/SunTimer";
+import { PageShell } from "@/components/PageShell";
 import { Sprite } from "@/components/pixel/Sprite";
 import { BLOOM, WILT } from "@/components/pixel/sprites";
-import { Button, ErrorNote, Heading, LanguageTag, Loading, Meter, Panel, Tag, pct } from "@/components/ui";
+import { Button, ButtonLink, EmptyState, ErrorNote, ErrorState, Heading, LanguageTag, Loading, Meter, PageHeader, Panel, Tag, pct } from "@/components/ui";
 import { errorText, post, useApi } from "@/lib/client";
 import { serverOffset, useCountdown } from "@/lib/clock";
-import type { ConsoleState, ControlAction } from "@/lib/api-types";
+import type { ConsolePlacement, ConsoleState, ControlAction, RoundStatus } from "@/lib/api-types";
 import { TEAM_COLORS, TEAM_NAMES } from "@/domain/teams";
+import { courseHref } from "@/app/teach/courses/[courseId]/tabs";
+
+const ROUND_STATUS: Record<RoundStatus, { label: string; color: string }> = {
+  pending: { label: "up next", color: "#ecdcb6" },
+  running: { label: "running", color: "#f6c445" },
+  paused: { label: "paused", color: "#f6c445" },
+  ended: { label: "ended", color: "#a4d77e" },
+  revealed: { label: "revealed", color: "#a4d77e" },
+};
 
 export function Console({ sessionId }: { sessionId: string }) {
+  const confirm = useConfirm();
+  const prompt = usePrompt();
+  const toast = useToast();
   const [offset, setOffset] = useState(0);
   const { data, error, mutate } = useApi<ConsoleState>(`/api/sessions/${sessionId}/console`, {
     refreshInterval: 1500,
@@ -44,25 +56,100 @@ export function Console({ sessionId }: { sessionId: string }) {
     };
   }, [sessionId, botsOn, closed]);
 
-  async function act(action: ControlAction) {
-    if (action === "close" && !window.confirm("Close this Session for everyone? Points become XP and the Session ends.")) return;
+  if (error) return <PageShell><ErrorState message={error.message} backHref="/teach" backLabel="Back to my courses" /></PageShell>;
+  if (!data) return <PageShell><Loading /></PageShell>;
+  const { session, round } = data;
+  const status = round?.timer.status;
+  const roundNo = (round?.position ?? 0) + 1;
+  const nextNo = session.roundIndex + 2;
+  const hasNext = session.roundIndex + 1 < session.roundCount;
+  const live = status === "running" || status === "paused";
+
+  async function run(action: ControlAction, done: string) {
     setBusy(true);
     setActionError("");
     try {
       await post(`/api/sessions/${sessionId}/control`, { action });
       await mutate();
+      toast(done);
     } catch (err) {
       setActionError(errorText(err));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function start() {
+    if (status === "ended") {
+      const ok = await confirm({
+        title: `Start Round ${nextNo} without revealing?`,
+        body: `The class hasn't seen the solution to Round ${roundNo} yet. Once the next Round starts, you can't reveal it any more.`,
+        confirmLabel: "Start without revealing",
+        cancelLabel: "Not yet",
+        tone: "sun",
+      });
+      if (!ok) return;
+    }
+    await run(round ? "next" : "start", `Round ${round ? nextNo : 1} has started. The sun is rising.`);
+  }
+
+  async function endRound() {
+    const ok = await confirm({
+      title: `End Round ${roundNo} now?`,
+      body: "Every student stops planting straight away. Points earned so far are kept, and you can reveal the solution next.",
+      confirmLabel: "End Round",
+      tone: "danger",
+    });
+    if (ok) await run("end", `Round ${roundNo} has ended.`);
+  }
+
+  async function reveal() {
+    if (live) {
+      const ok = await confirm({
+        title: "Reveal the solution now?",
+        body: `Round ${roundNo} is still ${status}. Revealing ends it for everyone and shows every plot's right line on the projector and on students' devices.`,
+        confirmLabel: "Reveal solution",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    await run("reveal", "The solution is on the projector.");
+  }
+
+  async function closeSession() {
+    const ok = await confirm({
+      title: "Close this Session?",
+      body: (
+        <>
+          <p>The Session ends for everyone, each student&apos;s points become XP, and it moves to Past Sessions. This can&apos;t be undone.</p>
+          {live && <p className="font-bold">Round {roundNo} is still {status}; it ends now.</p>}
+          {!live && hasNext && (
+            <p className="font-bold">
+              {session.roundCount - session.roundIndex - 1 === 1 ? "1 planned Round won't" : `${session.roundCount - session.roundIndex - 1} planned Rounds won't`} be played.
+            </p>
+          )}
+        </>
+      ),
+      confirmLabel: "Close Session",
+      tone: "danger",
+    });
+    if (ok) await run("close", "The Session is closed. Points became XP.");
   }
 
   async function addBots() {
+    const ok = await confirm({
+      title: `Add ${botCount} simulated students?`,
+      body: "They join this Session for the demo, appear on the projector by nickname, and show up in results marked “simulated”. They can't be removed afterwards.",
+      confirmLabel: "Add simulated students",
+      tone: "water",
+    });
+    if (!ok) return;
     setBusy(true);
+    setActionError("");
     try {
-      await post(`/api/sessions/${sessionId}/bots`, { count: botCount });
+      const { added } = await post<{ added: number }>(`/api/sessions/${sessionId}/bots`, { count: botCount });
       await mutate();
+      toast(added > 0 ? `Added ${added} simulated ${added === 1 ? "student" : "students"}.` : "Every simulated student is already in this Session.");
     } catch (err) {
       setActionError(errorText(err));
     } finally {
@@ -70,111 +157,162 @@ export function Console({ sessionId }: { sessionId: string }) {
     }
   }
 
-  async function spotlight(placementId: string) {
+  async function spotlight(p: ConsolePlacement) {
+    const ok = await confirm({
+      title: "Spotlight this reason?",
+      body: (
+        <>
+          <blockquote className="px-row px-3 py-2 italic">&ldquo;{p.reason}&rdquo;</blockquote>
+          <p>
+            It&apos;s pinned on the projector under <strong>{p.nickname}</strong>, and they get +300 points. This can&apos;t be undone.
+          </p>
+        </>
+      ),
+      confirmLabel: "Pin on the projector",
+      tone: "sun",
+    });
+    if (!ok) return;
+    setActionError("");
     try {
-      await post(`/api/sessions/${sessionId}/spotlight`, { placementId });
+      await post(`/api/sessions/${sessionId}/spotlight`, { placementId: p.id });
       await mutate();
+      toast(`${p.nickname}'s reason is pinned on the projector.`);
     } catch (err) {
       setActionError(errorText(err));
     }
   }
 
   async function rename(userId: string, current: string) {
-    const nickname = window.prompt("New nickname for this student:", current);
-    if (!nickname) return;
+    const nickname = await prompt({
+      title: `Rename ${current}`,
+      body: "Use this for a rude or confusing nickname. The new one shows on the projector straight away and replaces the student's nickname everywhere.",
+      label: "New nickname",
+      initial: current,
+      maxLength: 20,
+      confirmLabel: "Rename",
+    });
+    if (!nickname || nickname === current) return;
+    setActionError("");
     try {
       await post(`/api/sessions/${sessionId}/rename`, { userId, nickname });
       await mutate();
+      toast(`${current} is now ${nickname}.`);
     } catch (err) {
       setActionError(errorText(err));
     }
   }
 
-  if (error) return <PageShell><ErrorNote>{error.message}</ErrorNote></PageShell>;
-  if (!data) return <PageShell><Loading /></PageShell>;
-  const { session, round } = data;
-  const status = round?.timer.status;
-  const hasNext = session.roundIndex + 1 < session.roundCount;
+  const hint = closed
+    ? "This Session has closed."
+    : !round
+      ? `${session.participants} ${session.participants === 1 ? "student is" : "students are"} waiting in the Lobby. Start when you're ready.`
+      : status === "running"
+        ? `Round ${roundNo} is running.`
+        : status === "paused"
+          ? "Paused. Students can't plant until you resume."
+          : status === "ended"
+            ? `Round ${roundNo} has ended. Reveal the solution to talk it through.`
+            : hasNext
+              ? `The solution is shown. Start Round ${nextNo} when the class is ready.`
+              : "That was the last Round. Close the Session to turn points into XP.";
 
   return (
-    <PageShell wide>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <div className="flex flex-col gap-3">
-          <Panel>
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="font-pixel text-sm">
-                  {session.courseCode} · {session.mode === "teams" ? `Teams of ${session.teamCount}` : "Solo"} · Hand of {session.handSize}
-                </p>
-                <Heading className="!text-2xl">Lecturer console</Heading>
-                <p className="text-sm">Private: real names and reasons stay on this screen.</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-bold">Join code</p>
-                <p className="font-mono text-2xl tracking-[0.25em]">{session.joinCode}</p>
-              </div>
+    <PageShell>
+      <PageHeader
+        breadcrumbs={[{ label: "My courses", href: "/teach" }, { label: session.courseCode, href: courseHref(session.courseId) }, { label: "Live console" }]}
+        title="Live console"
+        description={`${session.courseCode} · ${session.mode === "teams" ? `Teams of ${session.teamCount}` : "Solo"} · Hand of ${session.handSize}. Private: real names and reasons stay on this screen.`}
+        actions={
+          <>
+            <div className="mr-2 text-right">
+              <p className="text-xs font-bold">Join code</p>
+              <p className="font-mono text-2xl leading-none tracking-[0.25em]">{session.joinCode}</p>
             </div>
-            <div className="mt-3 flex flex-wrap gap-1">
-              <Button tone="water" onClick={() => window.open(`/projector/${sessionId}`, "codeline-projector")}>
-                Open projector view
-              </Button>
-              {closed ? null : !round || (status !== "running" && status !== "paused" && hasNext) ? (
-                <Button tone="sun" disabled={busy || !hasNext} onClick={() => act(round ? "next" : "start")}>
-                  Start Round {session.roundIndex + 2}
-                </Button>
-              ) : null}
-              {status === "running" && (
-                <Button tone="secondary" disabled={busy} onClick={() => act("pause")}>
-                  Pause
-                </Button>
-              )}
-              {status === "paused" && (
-                <Button disabled={busy} onClick={() => act("resume")}>
-                  Resume
-                </Button>
-              )}
-              {(status === "running" || status === "paused") && (
-                <Button tone="secondary" disabled={busy} onClick={() => act("end")}>
-                  End Round
-                </Button>
-              )}
-              {round && status !== "revealed" && !closed && (
-                <Button tone="secondary" disabled={busy} onClick={() => act("reveal")}>
-                  Reveal solution
-                </Button>
-              )}
-              {!closed && (
-                <Button tone="danger" disabled={busy} onClick={() => act("close")}>
+            <Button tone="water" onClick={() => window.open(`/projector/${sessionId}`, "codeline-projector")}>
+              Open projector view
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div className="flex flex-col gap-4">
+          <Panel>
+            <Heading>Round controls</Heading>
+            <p className="mt-1 text-sm" role="status">
+              {hint}
+            </p>
+            {!closed && (
+              <div className="mt-3 flex flex-wrap gap-1">
+                {(!round || (!live && hasNext)) && (
+                  <Button tone={!round || status === "revealed" ? "sun" : "secondary"} disabled={busy} onClick={start}>
+                    Start Round {round ? nextNo : 1}
+                  </Button>
+                )}
+                {status === "running" && (
+                  <Button tone="secondary" disabled={busy} onClick={() => run("pause", "Round paused.")}>
+                    Pause
+                  </Button>
+                )}
+                {status === "paused" && (
+                  <Button disabled={busy} onClick={() => run("resume", "Round resumed.")}>
+                    Resume
+                  </Button>
+                )}
+                {live && (
+                  <Button tone="secondary" disabled={busy} onClick={endRound}>
+                    End Round
+                  </Button>
+                )}
+                {round && status !== "revealed" && (
+                  <Button tone={status === "ended" ? "sun" : "secondary"} disabled={busy} onClick={reveal}>
+                    Reveal solution
+                  </Button>
+                )}
+              </div>
+            )}
+            <ErrorNote>{actionError}</ErrorNote>
+            {!closed && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-parchment-dark pt-3">
+                <p className="text-xs text-ink-soft">Closing ends the Session for everyone and turns points into XP.</p>
+                <Button tone="danger" disabled={busy} onClick={closeSession}>
                   Close Session
                 </Button>
-              )}
-            </div>
-            <ErrorNote>{actionError}</ErrorNote>
+              </div>
+            )}
           </Panel>
 
           {closed ? (
             <Panel>
-              <Heading>This Session has closed</Heading>
-              <p className="mt-1">Its results are in the Course dashboard.</p>
+              <EmptyState
+                title="This Session has closed"
+                action={
+                  <ButtonLink href={courseHref(session.courseId, "dashboard")} tone="secondary">
+                    See the course dashboard
+                  </ButtonLink>
+                }
+              >
+                Every decision below is kept, and the results are in the course dashboard.
+              </EmptyState>
             </Panel>
           ) : (
             <Panel>
               <p className="mb-2 flex flex-wrap items-center gap-2 font-pixel text-xl">
-                {round ? `Round ${round.position + 1}: ${round.exercise.title}` : "Lobby"}
+                {round ? `Round ${roundNo}: ${round.exercise.title}` : "Lobby"}
                 {round && <LanguageTag language={round.exercise.language} />}
               </p>
-              {round ? <SunTimer timer={round.timer} left={left} /> : <p>{session.participants} students are waiting. Start when you&apos;re ready.</p>}
+              {round && <SunTimer timer={round.timer} left={left} />}
               <div className="mt-3">
                 <Meter value={data.progress.placed} max={data.progress.dealt} color="#e9b949" label="Class progress" />
                 <p className="mt-1 text-sm">
                   {data.progress.placed} of {data.progress.dealt} seeds planted · {session.participants} students
                 </p>
               </div>
-              <ol className="mt-3 flex flex-wrap gap-2 text-sm">
+              <ol className="mt-3 flex flex-wrap gap-2 text-sm" aria-label="Rounds in this Session">
                 {session.rounds.map((r) => (
                   <li key={r.position}>
-                    <Tag color={r.status === "running" ? "#f6c445" : r.status === "pending" ? "#ecdcb6" : "#a4d77e"}>
-                      {r.position + 1}. {r.exerciseTitle} · {Math.round(r.timeLimitS / 60)} min · {r.status}
+                    <Tag color={ROUND_STATUS[r.status].color}>
+                      {r.position + 1}. {r.exerciseTitle} · {Math.round(r.timeLimitS / 60)} min · {ROUND_STATUS[r.status].label}
                     </Tag>
                   </li>
                 ))}
@@ -196,7 +334,7 @@ export function Console({ sessionId }: { sessionId: string }) {
                         <span>
                           Step {s.position + 1}: {s.pseudocode}
                         </span>
-                        <span>{pct(s.firstTryRate)} first try</span>
+                        <span className="whitespace-nowrap">{pct(s.firstTryRate)} first try</span>
                       </div>
                       {s.commonWrong && (
                         <p className="text-xs text-ink-soft">
@@ -211,7 +349,7 @@ export function Console({ sessionId }: { sessionId: string }) {
 
           {!closed && (
             <Panel className="!bg-[#eef3f8]">
-              <p className="font-pixel">Demo tool: simulated students</p>
+              <Heading>Demo tool: simulated students</Heading>
               <p className="text-xs">For demos only. Simulated students are marked in every table and export.</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <input
@@ -234,14 +372,14 @@ export function Console({ sessionId }: { sessionId: string }) {
           )}
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <Panel>
             <Heading>Every decision, live</Heading>
             <p className="text-sm">Spotlight a good reason to pin it on the projector (+300 points).</p>
             <ul className="mt-2 flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1">
-              {data.placements.length === 0 && <li className="text-sm">No Placements yet.</li>}
+              {data.placements.length === 0 && <li className="px-row px-3 py-4 text-center text-sm">No Placements yet. They appear here as students plant.</li>}
               {data.placements.map((p) => (
-                <li key={p.id} className="bg-parchment-dark/60 p-2 text-sm" style={{ boxShadow: "0 0 0 2px #c9b48a" }}>
+                <li key={p.id} className="px-row p-2 text-sm">
                   <div className="flex items-center gap-2">
                     <Sprite grid={p.correct ? BLOOM : WILT} scale={2} />
                     <span className="font-bold">{p.name}</span>
@@ -259,7 +397,7 @@ export function Console({ sessionId }: { sessionId: string }) {
                       {p.spotlighted ? (
                         <Tag color="#f6c445">Spotlighted</Tag>
                       ) : (
-                        <button className="px-btn px-btn-sun !px-2 !py-0.5 text-xs" onClick={() => spotlight(p.id)}>
+                        <button type="button" className="px-btn px-btn-sun !px-2 !py-0.5 text-xs" onClick={() => spotlight(p)}>
                           Spotlight
                         </button>
                       )}
@@ -272,10 +410,11 @@ export function Console({ sessionId }: { sessionId: string }) {
 
           <Panel>
             <Heading>Students ({data.participants.length})</Heading>
+            <p className="text-xs text-ink-soft">Select a nickname to rename it.</p>
             <div className="mt-2 max-h-[420px] overflow-auto">
               <table className="w-full text-left text-sm">
-                <thead className="sticky top-0 bg-parchment">
-                  <tr>
+                <thead className="sticky top-0 z-10 bg-parchment">
+                  <tr className="border-b-2 border-parchment-dark">
                     <th className="py-1 pr-2">Name</th>
                     <th className="pr-2">Nickname</th>
                     {session.mode === "teams" && <th className="pr-2">Farm</th>}
@@ -285,6 +424,13 @@ export function Console({ sessionId }: { sessionId: string }) {
                   </tr>
                 </thead>
                 <tbody>
+                  {data.participants.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center">
+                        Nobody has joined yet. Show the projector view so students can scan the code.
+                      </td>
+                    </tr>
+                  )}
                   {data.participants.map((p) => (
                     <tr key={p.userId} className="border-t border-parchment-dark">
                       <td className="py-1 pr-2">
@@ -292,7 +438,12 @@ export function Console({ sessionId }: { sessionId: string }) {
                         <span className="block text-xs text-ink-soft">{p.isSimulated ? "" : p.loginId}</span>
                       </td>
                       <td className="pr-2">
-                        <button className="underline decoration-dotted" onClick={() => rename(p.userId, p.nickname)} title="Rename this nickname">
+                        <button
+                          type="button"
+                          className="underline decoration-dotted underline-offset-2"
+                          onClick={() => rename(p.userId, p.nickname)}
+                          aria-label={`Rename ${p.nickname}`}
+                        >
                           {p.nickname}
                         </button>
                       </td>
@@ -312,9 +463,6 @@ export function Console({ sessionId }: { sessionId: string }) {
               </table>
             </div>
           </Panel>
-          <Link href="/teach" className="text-sm underline">
-            Back to my courses
-          </Link>
         </div>
       </div>
     </PageShell>

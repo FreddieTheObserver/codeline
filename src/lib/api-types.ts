@@ -223,6 +223,7 @@ export type SlotStatDto = {
 export type ConsoleState = {
   serverNow: string;
   session: ProjectorState["session"] & {
+    courseId: string;
     handSize: number;
     teamCount: number;
     rounds: { position: number; exerciseTitle: string; timeLimitS: number; status: RoundStatus }[];

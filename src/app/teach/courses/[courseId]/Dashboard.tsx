@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ErrorNote, Heading, Loading, Panel, Tag, pct } from "@/components/ui";
+import { EmptyState, ErrorNote, Heading, Loading, Panel, Tag, pct } from "@/components/ui";
 import { useApi } from "@/lib/client";
 import type { CourseDashboard, DashboardStudent } from "@/lib/api-types";
 
@@ -60,7 +60,7 @@ export function Dashboard({ courseId }: { courseId: string }) {
         <Heading>Hardest steps</Heading>
         <p className="text-sm">Share of students right on the first try, and where they most often put the line instead. Use it to decide what to reteach.</p>
         {data.exercises.length === 0 ? (
-          <p className="mt-3">No Rounds played yet.</p>
+          <EmptyState title="No Rounds played yet">Once a Session runs, this shows which steps the class finds hardest.</EmptyState>
         ) : (
           <>
             <div className="mt-2 flex flex-wrap gap-1">
@@ -82,7 +82,7 @@ export function Dashboard({ courseId }: { courseId: string }) {
                       </span>
                       <span>{pct(rate)}</span>
                     </div>
-                    <div className="h-3 bg-parchment-dark" style={{ boxShadow: "0 0 0 2px #3b2a1e" }}>
+                    <div className="mt-0.5 h-4 border-2 border-ink bg-parchment-dark">
                       <div className="h-full" style={{ width: `${Math.round((rate ?? 0) * 100)}%`, background: color }} />
                     </div>
                     {s.commonWrong && s.commonWrong.share > 0 && (
@@ -107,7 +107,7 @@ export function Dashboard({ courseId }: { courseId: string }) {
         </div>
         <div className="mt-2 max-h-[640px] overflow-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-parchment">
+            <thead className="sticky top-0 z-10 bg-parchment">
               <tr>
                 {header("name", "Student")}
                 {header("rounds", "Rounds", true)}
@@ -118,9 +118,16 @@ export function Dashboard({ courseId }: { courseId: string }) {
               </tr>
             </thead>
             <tbody>
+              {students.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center">
+                    No students yet. They appear here once they enrol with the join code.
+                  </td>
+                </tr>
+              )}
               {students.map((s) => (
                 <tr key={s.userId} className="border-t border-parchment-dark">
-                  <td className="py-1 pr-2">
+                  <td className="py-1.5 pr-2">
                     <Link href={`/teach/courses/${courseId}/students/${s.userId}`} className="font-bold underline">
                       {s.name}
                     </Link>

@@ -3,37 +3,53 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { PageShell } from "@/components/AppHeader";
+import { useToast } from "@/components/feedback";
 import { JoinQr } from "@/components/garden/JoinQr";
+import { PageShell } from "@/components/PageShell";
 import { Sprite } from "@/components/pixel/Sprite";
 import { SPROUT } from "@/components/pixel/sprites";
-import { ButtonLink, ErrorNote, Heading, LanguageTag, Loading, Panel, SampleTag, Tag, Title, cx } from "@/components/ui";
+import { ButtonLink, EmptyState, ErrorNote, ErrorState, Heading, LanguageTag, Loading, PageHeader, Panel, SampleTag, Tag, cx } from "@/components/ui";
 import { errorText, post, useApi } from "@/lib/client";
-import type { CourseDetail } from "@/lib/api-types";
+import type { CourseDetail, SessionSummary } from "@/lib/api-types";
 import { Dashboard } from "./Dashboard";
 import { SessionSetup } from "./SessionSetup";
+import { courseHref, type CourseTab } from "./tabs";
 
-type TabId = "exercises" | "run" | "dashboard" | "sessions";
+const SESSION_STATUS: Record<SessionSummary["status"], { label: string; color: string }> = {
+  lobby: { label: "In the Lobby", color: "#f6c445" },
+  live: { label: "Live", color: "#f6c445" },
+  closed: { label: "Closed", color: "#ecdcb6" },
+};
 
-export function CourseView({ courseId }: { courseId: string }) {
+export function CourseView({ courseId, initialTab }: { courseId: string; initialTab: CourseTab }) {
   const router = useRouter();
+  const toast = useToast();
   const { data, error, mutate } = useApi<CourseDetail>(`/api/courses/${courseId}`, { refreshInterval: 10000 });
-  const [tab, setTab] = useState<TabId>("exercises");
+  const [tab, setTab] = useState<CourseTab>(initialTab);
   const [actionError, setActionError] = useState("");
 
-  if (error) return <PageShell><ErrorNote>{error.message}</ErrorNote></PageShell>;
+  if (error) return <PageShell><ErrorState message={error.message} backHref="/teach" backLabel="Back to my courses" /></PageShell>;
   if (!data) return <PageShell><Loading /></PageShell>;
   const { course } = data;
-  const tabs: { id: TabId; label: string; show: boolean }[] = [
+  const tabs: { id: CourseTab; label: string; show: boolean }[] = [
     { id: "exercises", label: "Exercises", show: true },
     { id: "run", label: "Run a Session", show: course.canRun },
     { id: "dashboard", label: "Dashboard", show: true },
     { id: "sessions", label: "Past Sessions", show: true },
   ];
+  const current = tabs.find((t) => t.id === tab && t.show)?.id ?? "exercises";
 
-  async function duplicate(id: string) {
+  function select(next: CourseTab) {
+    setTab(next);
+    // Keeps the tab in the URL, so Back and the breadcrumbs on other pages return to it.
+    window.history.replaceState(null, "", courseHref(courseId, next));
+  }
+
+  async function duplicate(id: string, title: string) {
+    setActionError("");
     try {
       const { id: copy } = await post<{ id: string }>(`/api/exercises/${id}/duplicate`);
+      toast(`Made a copy of ${title}. You're editing the copy now.`);
       router.push(`/teach/exercises/${copy}`);
     } catch (err) {
       setActionError(errorText(err));
@@ -41,119 +57,153 @@ export function CourseView({ courseId }: { courseId: string }) {
   }
 
   return (
-    <PageShell wide>
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
-        <Panel>
-          <div className="flex flex-wrap items-center gap-2">
+    <PageShell>
+      <PageHeader
+        breadcrumbs={[{ label: "My courses", href: "/teach" }, { label: course.code }]}
+        tags={
+          <>
             <LanguageTag language={course.language} />
             {course.isSample && <SampleTag />}
-          </div>
-          <Title className="mt-2">
-            {course.code} · {course.title}
-          </Title>
-          <p className="mt-1">
-            {course.enrolled} students enrolled · {course.exercises} Exercises
-          </p>
-          {course.live && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 bg-[#fff3c4] p-2" style={{ boxShadow: "0 0 0 3px #e2a72e" }}>
-              <Sprite grid={SPROUT} scale={3} />
-              <span className="font-pixel">A Session is {course.live.status === "lobby" ? "waiting in the Lobby" : "live"}.</span>
-              <ButtonLink href={`/console/${course.live.sessionId}`} tone="sun" className="!py-1">
-                Open console
-              </ButtonLink>
+          </>
+        }
+        title={`${course.code} · ${course.title}`}
+        description={`${course.enrolled} students enrolled · ${course.exercises} Exercises`}
+        actions={
+          <Panel className="flex items-center gap-4 !p-3">
+            <JoinQr code={course.joinCode} size={84} caption={false} />
+            <div>
+              <p className="text-sm font-bold">Course join code</p>
+              <p className="font-mono text-3xl tracking-[0.25em]">{course.joinCode}</p>
+              <p className="max-w-[220px] text-xs">Students enter it once after signing up, or scan the code.</p>
             </div>
-          )}
-        </Panel>
-        <Panel className="flex items-center gap-4">
-          <JoinQr code={course.joinCode} size={110} />
-          <div>
-            <p className="text-sm font-bold">Course join code</p>
-            <p className="font-mono text-3xl tracking-[0.25em]">{course.joinCode}</p>
-            <p className="max-w-[220px] text-xs">Students enter it once after signing up, or scan the code.</p>
-          </div>
-        </Panel>
-      </div>
+          </Panel>
+        }
+      />
 
-      <nav className="mt-4 flex flex-wrap gap-1" role="tablist" aria-label="Course sections">
+      {course.live && (
+        <Panel className="mb-4 flex flex-wrap items-center gap-3 !bg-[#fff3c4] !py-2">
+          <Sprite grid={SPROUT} scale={3} />
+          <span className="flex-1 font-pixel">A Session is {course.live.status === "lobby" ? "waiting in the Lobby" : "live right now"}.</span>
+          <ButtonLink href={`/console/${course.live.sessionId}`} tone="sun" className="!py-1">
+            Open console
+          </ButtonLink>
+        </Panel>
+      )}
+
+      <div className="flex flex-wrap gap-1" role="tablist" aria-label="Course sections">
         {tabs
           .filter((t) => t.show)
           .map((t) => (
             <button
               key={t.id}
+              id={`tab-${t.id}`}
+              type="button"
               role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={cx("px-btn", tab === t.id ? "px-btn-sun" : "px-btn-secondary")}
+              aria-selected={current === t.id}
+              aria-controls={`panel-${t.id}`}
+              onClick={() => select(t.id)}
+              className={cx("px-btn", current === t.id ? "px-btn-sun" : "px-btn-secondary")}
             >
               {t.label}
             </button>
           ))}
-      </nav>
+      </div>
       <ErrorNote>{actionError}</ErrorNote>
 
-      <div className="mt-3" role="tabpanel">
-        {tab === "exercises" && (
+      <div className="mt-3" role="tabpanel" id={`panel-${current}`} aria-labelledby={`tab-${current}`}>
+        {current === "exercises" && (
           <Panel>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Heading>Exercises</Heading>
+              <div>
+                <Heading>Exercises</Heading>
+                <p className="text-sm">Each Exercise is one program, split into steps. A Session plays one Exercise per Round.</p>
+              </div>
               {course.canEdit && <ButtonLink href={`/teach/courses/${courseId}/exercises/new`}>New Exercise</ButtonLink>}
             </div>
-            <ul className="mt-3 flex flex-col gap-2">
-              {data.exercises.length === 0 && <li>No Exercises yet.</li>}
-              {data.exercises.map((e) => (
-                <li key={e.id} className="flex flex-wrap items-center gap-3 bg-parchment-dark/50 p-2" style={{ boxShadow: "0 0 0 2px #c9b48a" }}>
-                  <span className="font-pixel text-xl">{e.title}</span>
-                  <LanguageTag language={e.language} />
-                  <span className="text-sm">
-                    {e.steps} steps · {e.dealable} dealt as seeds
-                  </span>
-                  {e.played && <Tag color="#a4d77e">played</Tag>}
-                  <span className="ml-auto flex gap-1">
-                    <ButtonLink href={`/teach/exercises/${e.id}`} tone="secondary" className="!py-1">
-                      {course.canEdit ? "Edit" : "View"}
-                    </ButtonLink>
-                    {course.canEdit && (
-                      <button className="px-btn px-btn-secondary !py-1" onClick={() => duplicate(e.id)}>
-                        Duplicate
-                      </button>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {data.exercises.length === 0 ? (
+              <EmptyState
+                title="No Exercises yet"
+                action={course.canEdit ? <ButtonLink href={`/teach/courses/${courseId}/exercises/new`}>Write the first Exercise</ButtonLink> : undefined}
+              >
+                Paste a solution, write a plain-words step beside each line, and test play it before class.
+              </EmptyState>
+            ) : (
+              <ul className="mt-3 flex flex-col gap-2">
+                {data.exercises.map((e) => (
+                  <li key={e.id} className="px-row flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                    <span className="font-pixel text-xl">{e.title}</span>
+                    <LanguageTag language={e.language} />
+                    {e.played && <Tag color="#a4d77e">played</Tag>}
+                    <span className="text-sm text-ink-soft">
+                      {e.steps} steps · {e.dealable} dealt as seeds
+                    </span>
+                    <span className="ml-auto flex gap-1">
+                      <ButtonLink href={`/teach/exercises/${e.id}`} tone="secondary" className="!py-1">
+                        {course.canEdit ? "Edit" : "View"}
+                      </ButtonLink>
+                      {course.canEdit && (
+                        <button type="button" className="px-btn px-btn-secondary !py-1" onClick={() => duplicate(e.id, e.title)}>
+                          Duplicate
+                        </button>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
         )}
-        {tab === "run" && <SessionSetup detail={data} onCreated={(id) => { void mutate(); router.push(`/console/${id}`); }} />}
-        {tab === "dashboard" && <Dashboard courseId={courseId} />}
-        {tab === "sessions" && (
+        {current === "run" && (
+          <SessionSetup
+            detail={data}
+            onCreated={(id) => {
+              void mutate();
+              router.push(`/console/${id}`);
+            }}
+          />
+        )}
+        {current === "dashboard" && <Dashboard courseId={courseId} />}
+        {current === "sessions" && (
           <Panel>
             <Heading>Past Sessions</Heading>
-            <table className="mt-2 w-full text-left text-sm">
-              <thead>
-                <tr>
-                  <th className="py-1">When</th>
-                  <th>Mode</th>
-                  <th className="text-right">Rounds</th>
-                  <th className="text-right">Students</th>
-                  <th className="text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.sessions.map((s) => (
-                  <tr key={s.id} className="border-t border-parchment-dark">
-                    <td className="py-1">
-                      <Link href={`/console/${s.id}`} className="underline">
-                        {new Date(s.createdAt).toLocaleString()}
-                      </Link>
-                    </td>
-                    <td>{s.mode === "teams" ? "Teams" : "Solo"}</td>
-                    <td className="text-right">{s.rounds}</td>
-                    <td className="text-right">{s.participants}</td>
-                    <td className="text-right">{s.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {data.sessions.length === 0 ? (
+              <EmptyState title="No Sessions yet">Sessions you run appear here, with how many students took part.</EmptyState>
+            ) : (
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full min-w-[560px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-parchment-dark">
+                      <th className="py-2 pr-3">When</th>
+                      <th className="pr-3">Mode</th>
+                      <th className="pr-3 text-right">Rounds</th>
+                      <th className="pr-3 text-right">Students</th>
+                      <th className="pr-3">Status</th>
+                      <th className="text-right">
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.sessions.map((s) => (
+                      <tr key={s.id} className="border-t border-parchment-dark">
+                        <td className="py-2 pr-3">{new Date(s.createdAt).toLocaleString()}</td>
+                        <td className="pr-3">{s.mode === "teams" ? "Teams" : "Solo"}</td>
+                        <td className="pr-3 text-right">{s.rounds}</td>
+                        <td className="pr-3 text-right">{s.participants}</td>
+                        <td className="pr-3">
+                          <Tag color={SESSION_STATUS[s.status].color}>{SESSION_STATUS[s.status].label}</Tag>
+                        </td>
+                        <td className="text-right">
+                          <Link href={`/console/${s.id}`} className="font-bold underline underline-offset-2">
+                            {s.status === "closed" ? "View decisions" : "Open console"}
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Panel>
         )}
       </div>

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Nunito, Pixelify_Sans } from "next/font/google";
+import { FeedbackProvider } from "@/components/feedback";
 import "./globals.css";
 
 const pixel = Pixelify_Sans({ variable: "--font-pixelify", subsets: ["latin"], weight: ["500", "700"] });
@@ -16,7 +17,9 @@ export const viewport: Viewport = { themeColor: "#7cbf5a" };
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${pixel.variable} ${body.variable} ${mono.variable} h-full`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <FeedbackProvider>{children}</FeedbackProvider>
+      </body>
     </html>
   );
 }

@@ -1,22 +1,27 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { PageShell } from "@/components/AppHeader";
+import { useConfirm, useToast } from "@/components/feedback";
 import { Board, type PlotView } from "@/components/garden/Board";
 import { HandTray } from "@/components/garden/HandTray";
-import { Button, ErrorNote, Field, Heading, Panel, Tag, Title } from "@/components/ui";
+import { PageShell } from "@/components/PageShell";
+import { useLeaveGuard } from "@/components/useLeaveGuard";
+import { Button, ErrorNote, Field, Heading, PageHeader, Panel, Tag, cx } from "@/components/ui";
 import { del, errorText, post, put } from "@/lib/client";
 import { LANGUAGES, splitCode } from "@/domain/exercise-text";
 import { fitsSlot } from "@/domain/judge";
 import { seededRng, shuffled } from "@/domain/random";
 import type { ExerciseDto } from "@/lib/api-types";
+import { courseHref } from "./courses/[courseId]/tabs";
 
 type Row = { key: string; id?: string; pseudocode: string; code: string; indent: number; given: boolean; played?: boolean };
 
 let keySeq = 0;
 const newKey = () => `row-${++keySeq}`;
+
+const ROW_GRID = "grid gap-2 md:grid-cols-[2rem_minmax(0,1fr)_minmax(0,1.3fr)_13rem] md:items-center";
+const SMALL_BTN = "px-btn !m-0.5 !px-1.5 !py-0.5 text-xs";
 
 export function ExerciseEditor({
   courseId,
@@ -30,6 +35,8 @@ export function ExerciseEditor({
   onSaved?: () => Promise<void>;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
+  const toast = useToast();
   const canEdit = initial ? initial.canEdit : true;
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -37,33 +44,42 @@ export function ExerciseEditor({
   const [rows, setRows] = useState<Row[]>(() => (initial?.rows ?? []).map((r) => ({ ...r, key: newKey() })));
   const [paste, setPaste] = useState("");
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
+  useLeaveGuard(canEdit && dirty, initial ? initial.title : "this new Exercise");
 
-  const update = (i: number, patch: Partial<Row>) => {
-    setSaved(false);
-    setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const edit = <T,>(set: (value: T) => void) => (value: T) => {
+    set(value);
+    setDirty(true);
   };
+  const editRows = edit(setRows);
+  const update = (i: number, patch: Partial<Row>) => editRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const move = (i: number, by: number) => {
     const j = i + by;
     if (j < 0 || j >= rows.length) return;
     const next = [...rows];
     [next[i], next[j]] = [next[j], next[i]];
-    setRows(next);
-    setSaved(false);
+    editRows(next);
   };
 
-  function applyPaste() {
+  async function applyPaste() {
     if (!paste.trim()) return;
     if (rows.some((r) => r.played)) {
       setError("This Exercise has been played, so its rows can't be replaced. Duplicate it first.");
       return;
     }
-    if (rows.length && !window.confirm("Replace the current rows with the pasted code?")) return;
-    setRows(splitCode(paste).map((r) => ({ ...r, key: newKey() })));
+    if (rows.length) {
+      const ok = await confirm({
+        title: "Replace the current rows?",
+        body: `The ${rows.length} rows below, with their signposts, are replaced by one row per line of the pasted code.`,
+        confirmLabel: "Replace rows",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    editRows(splitCode(paste).map((r) => ({ ...r, key: newKey() })));
     setPaste("");
-    setSaved(false);
   }
 
   async function save() {
@@ -73,10 +89,13 @@ export function ExerciseEditor({
     try {
       if (initial) {
         await put(`/api/exercises/${initial.id}`, body);
-        setSaved(true);
+        setDirty(false);
+        toast(`${title || "Exercise"} is saved.`);
         await onSaved?.();
       } else {
         const { id } = await post<{ id: string }>(`/api/courses/${courseId}/exercises`, body);
+        setDirty(false);
+        toast(`${title || "Exercise"} is created. Test play it before class.`);
         router.replace(`/teach/exercises/${id}`);
       }
     } catch (err) {
@@ -87,35 +106,52 @@ export function ExerciseEditor({
   }
 
   async function remove() {
-    if (!initial || !window.confirm(`Delete ${initial.title}? This can't be undone.`)) return;
+    if (!initial) return;
+    const ok = await confirm({
+      title: `Delete ${initial.title}?`,
+      body: "The Exercise and its rows are removed from the course. This can't be undone.",
+      confirmLabel: "Delete Exercise",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await del(`/api/exercises/${initial.id}`);
-      router.push(`/teach/courses/${courseId}`);
+      setDirty(false);
+      toast(`${initial.title} is deleted.`);
+      router.push(courseHref(courseId));
     } catch (err) {
       setError(errorText(err));
     }
   }
 
   return (
-    <PageShell wide>
-      <p className="text-sm">
-        <Link href={`/teach/courses/${courseId}`} className="underline">
-          {courseCode}
-        </Link>{" "}
-        / Exercise
-      </p>
-      <Title className="mt-1">{initial ? (canEdit ? `Edit ${initial.title}` : initial.title) : "New Exercise"}</Title>
-      {initial?.played && <p className="mt-1 text-sm">This Exercise has been played. You can fix wording and add rows; removing a played row needs a duplicate.</p>}
+    <PageShell>
+      <PageHeader
+        breadcrumbs={[
+          { label: "My courses", href: "/teach" },
+          { label: courseCode, href: courseHref(courseId) },
+          { label: "Exercises", href: courseHref(courseId) },
+          { label: initial ? initial.title : "New Exercise" },
+        ]}
+        title={initial ? (canEdit ? `Edit ${initial.title}` : initial.title) : "New Exercise"}
+        description={
+          !canEdit
+            ? "Read-only: only the course lecturer can change this Exercise."
+            : initial?.played
+              ? "This Exercise has been played. You can fix wording and add rows; removing a played row needs a duplicate."
+              : "Paste the solution, write a plain-words step for each line, then test play it as a student."
+        }
+      />
 
-      <div className={testing ? "mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]" : "mt-4 grid gap-4"}>
+      <div className={testing ? "grid items-start gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]" : "grid gap-4"}>
         <div className="flex flex-col gap-3">
           <Panel>
-            <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
               <Field label="Title">
-                <input className="px-input" value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} disabled={!canEdit} placeholder="FindMax" />
+                <input className="px-input" value={title} onChange={(e) => edit(setTitle)(e.target.value)} disabled={!canEdit} placeholder="FindMax" />
               </Field>
               <Field label="Language">
-                <select className="px-input" value={language} onChange={(e) => { setLanguage(e.target.value); setSaved(false); }} disabled={!canEdit}>
+                <select className="px-input" value={language} onChange={(e) => edit(setLanguage)(e.target.value)} disabled={!canEdit}>
                   {LANGUAGES.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.label}
@@ -125,7 +161,13 @@ export function ExerciseEditor({
               </Field>
               <div className="sm:col-span-2">
                 <Field label="What the program does (optional)">
-                  <input className="px-input" value={description} onChange={(e) => { setDescription(e.target.value); setSaved(false); }} disabled={!canEdit} placeholder="Find the largest score in an array." />
+                  <input
+                    className="px-input"
+                    value={description}
+                    onChange={(e) => edit(setDescription)(e.target.value)}
+                    disabled={!canEdit}
+                    placeholder="Find the largest score in an array."
+                  />
                 </Field>
               </div>
             </div>
@@ -135,7 +177,13 @@ export function ExerciseEditor({
             <Panel>
               <Heading>1. Paste the solution code</Heading>
               <p className="text-sm">CodeLine splits it into one row per line and keeps the indentation in the plot. Lines that are only braces start as Given.</p>
-              <textarea className="px-input mt-2 h-36 font-mono text-sm" value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={"public class FindMax {\n    public static void main(String[] args) {\n        ..."} />
+              <textarea
+                className="px-input mt-2 h-36 font-mono text-sm"
+                value={paste}
+                onChange={(e) => setPaste(e.target.value)}
+                aria-label="Solution code to split into rows"
+                placeholder={"public class FindMax {\n    public static void main(String[] args) {\n        ..."}
+              />
               <Button tone="water" onClick={applyPaste} disabled={!paste.trim()}>
                 Split into rows
               </Button>
@@ -145,10 +193,19 @@ export function ExerciseEditor({
           <Panel>
             <Heading>{canEdit ? "2. Write a signpost for each row" : "Rows"}</Heading>
             <p className="text-sm">The pseudocode step is what students read. Given rows are planted for everyone and never dealt.</p>
-            <ol className="mt-3 flex flex-col gap-2">
+            {rows.length > 0 && (
+              <div className={`${ROW_GRID} mt-3 hidden px-2 text-xs font-bold md:grid`} aria-hidden="true">
+                <span>#</span>
+                <span>Signpost (pseudocode)</span>
+                <span>Code</span>
+                <span>Options</span>
+              </div>
+            )}
+            <ol className="mt-1 flex flex-col gap-2">
+              {rows.length === 0 && <li className="px-row px-3 py-4 text-center text-sm">No rows yet. Paste the solution code above, or add rows one at a time.</li>}
               {rows.map((r, i) => (
-                <li key={r.key} className="grid gap-2 bg-parchment-dark/50 p-2 md:grid-cols-[28px_minmax(0,1fr)_minmax(0,1.3fr)_auto]" style={{ boxShadow: "0 0 0 2px #c9b48a" }}>
-                  <span className="pt-3 font-pixel">{i + 1}</span>
+                <li key={r.key} className={`${ROW_GRID} px-row p-2`}>
+                  <span className="font-pixel md:text-center">{i + 1}</span>
                   <input
                     className="px-input text-sm"
                     value={r.pseudocode}
@@ -178,21 +235,27 @@ export function ExerciseEditor({
                     />
                   </div>
                   <div className="flex items-center gap-1">
-                    <label className="flex items-center gap-1 text-xs font-bold">
+                    <label className="mr-1 flex items-center gap-1 text-xs font-bold">
                       <input type="checkbox" checked={r.given} onChange={(e) => update(i, { given: e.target.checked })} disabled={!canEdit} /> Given
                     </label>
                     {canEdit && (
                       <>
-                        <button type="button" className="px-btn px-btn-secondary !m-0.5 !px-1.5 !py-0.5 text-xs" onClick={() => move(i, -1)} aria-label={`Move row ${i + 1} up`}>
+                        <button type="button" className={cx(SMALL_BTN, "px-btn-secondary")} onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move row ${i + 1} up`}>
                           ↑
                         </button>
-                        <button type="button" className="px-btn px-btn-secondary !m-0.5 !px-1.5 !py-0.5 text-xs" onClick={() => move(i, 1)} aria-label={`Move row ${i + 1} down`}>
+                        <button
+                          type="button"
+                          className={cx(SMALL_BTN, "px-btn-secondary")}
+                          onClick={() => move(i, 1)}
+                          disabled={i === rows.length - 1}
+                          aria-label={`Move row ${i + 1} down`}
+                        >
                           ↓
                         </button>
                         <button
                           type="button"
-                          className="px-btn px-btn-danger !m-0.5 !px-1.5 !py-0.5 text-xs"
-                          onClick={() => { setRows(rows.filter((_, j) => j !== i)); setSaved(false); }}
+                          className={cx(SMALL_BTN, "px-btn-danger")}
+                          onClick={() => editRows(rows.filter((_, j) => j !== i))}
                           disabled={r.played}
                           title={r.played ? "Already played; duplicate the Exercise to remove it" : undefined}
                           aria-label={`Remove row ${i + 1}`}
@@ -201,41 +264,53 @@ export function ExerciseEditor({
                         </button>
                       </>
                     )}
-                    {r.played && <Tag color="#a4d77e">played</Tag>}
+                    {r.played && (
+                      <Tag color="#a4d77e" className="ml-1">
+                        played
+                      </Tag>
+                    )}
                   </div>
                 </li>
               ))}
             </ol>
             {canEdit && (
-              <Button tone="secondary" className="mt-2" onClick={() => { setRows([...rows, { key: newKey(), pseudocode: "", code: "", indent: 0, given: false }]); setSaved(false); }}>
+              <Button tone="secondary" className="mt-2" onClick={() => editRows([...rows, { key: newKey(), pseudocode: "", code: "", indent: 0, given: false }])}>
                 Add a row
               </Button>
             )}
           </Panel>
 
           {canEdit && (
-            <Panel className="flex flex-wrap items-center gap-2">
-              <Button onClick={save} disabled={busy}>
-                {busy ? "Saving..." : initial ? "Save changes" : "Create Exercise"}
-              </Button>
-              {saved && <span className="font-bold text-leaf-dark" role="status">Saved.</span>}
-              {initial && !initial.played && (
-                <Button tone="danger" onClick={remove} className="ml-auto">
-                  Delete
+            <div className="sticky bottom-0 z-20">
+              <Panel className="flex flex-wrap items-center gap-x-3 gap-y-1 !py-2">
+                <Button onClick={save} disabled={busy || (Boolean(initial) && !dirty)}>
+                  {busy ? "Saving..." : initial ? "Save changes" : "Create Exercise"}
                 </Button>
-              )}
-              <div className="w-full">
-                <ErrorNote>{error}</ErrorNote>
-              </div>
-            </Panel>
+                <span className="text-sm text-ink-soft" role="status">
+                  {!initial ? "Not created yet." : dirty ? "You have unsaved changes." : "All changes saved."}
+                </span>
+                {initial && !initial.played && (
+                  <Button tone="danger" onClick={remove} className="ml-auto">
+                    Delete
+                  </Button>
+                )}
+                {error && (
+                  <div className="w-full">
+                    <ErrorNote>{error}</ErrorNote>
+                  </div>
+                )}
+              </Panel>
+            </div>
           )}
         </div>
 
         <div className="flex flex-col gap-3">
-          <Panel>
-            <Heading>Test play</Heading>
-            <p className="text-sm">Try it as a student, with every seed in your pouch. Nothing is saved.</p>
-            <Button tone="sun" className="mt-2" onClick={() => setTesting((t) => !t)} disabled={!rows.some((r) => !r.given && r.code.trim())}>
+          <Panel className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <Heading>Test play</Heading>
+              <p className="text-sm">Try it as a student, with every seed in your pouch. Nothing is saved.</p>
+            </div>
+            <Button tone="sun" onClick={() => setTesting((t) => !t)} disabled={!rows.some((r) => !r.given && r.code.trim())}>
               {testing ? "Stop test" : "Start test play"}
             </Button>
           </Panel>
