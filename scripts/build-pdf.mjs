@@ -150,13 +150,11 @@ const html = `<!doctype html><html><head><meta charset="utf-8">
   .flow.n1 { grid-template-columns: 1fr; }
   .flow.n2, .flow.n4 { grid-template-columns: 1fr 1fr; }
   .flow.n3, .flow.n5 { grid-template-columns: 1fr 1fr 1fr; }
-  .flow.n1 figure { display: grid; grid-template-columns: 1.7fr 1fr; gap: 6mm; align-items: start; }
+  .flow.n1 figure { display: grid; grid-template-columns: 215mm 1fr; gap: 6mm; align-items: start; }
   figure { margin: 0; position: relative; }
-  img { width: 100%; object-fit: cover; object-position: top; border: 2px solid #3b2a1e; background: #7cbf5a; display: block; }
-  .n1 img { height: 150mm; }
-  .n2 img, .n3 img { height: 110mm; }
-  .n4 img { height: 62mm; }
-  .n5 img { height: 60mm; }
+  /* Screens are 1440 wide and at least 900 tall, so a box no narrower than 16:10 never cuts their sides; tall pages lose only their bottom. */
+  figure img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; border: 2px solid #3b2a1e; background: #7cbf5a; display: block; }
+  .n4 img { aspect-ratio: auto; height: 62mm; }
   .step { position: absolute; top: -3mm; left: -2mm; background: #f6c445; border: 2px solid #3b2a1e; width: 7mm; height: 7mm; display: grid; place-items: center; font-size: 11pt; z-index: 1; }
   figcaption { font-size: 9pt; margin-top: 1.5mm; line-height: 1.3; }
   .chips { display: flex; flex-wrap: wrap; gap: 1.2mm; margin-top: 1.5mm; }
