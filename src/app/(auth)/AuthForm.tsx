@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { flashToast } from "@/components/feedback";
 import { homeFor } from "@/components/nav";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -10,10 +10,23 @@ import { ValleyScene } from "@/components/ValleyScene";
 import { errorText, post } from "@/lib/client";
 import type { Viewer } from "@/lib/api-types";
 
+// Where to go after signing in, such as a QR code's join link. Only pages on this site count: resolving it
+// as a URL also rejects "//host" and "/\host", which browsers treat as another site.
+function safeNext(): string | null {
+  const raw = new URLSearchParams(window.location.search).get("next");
+  if (!raw) return null;
+  try {
+    const url = new URL(raw, window.location.origin);
+    return url.origin === window.location.origin ? url.pathname + url.search + url.hash : null;
+  } catch {
+    return null;
+  }
+}
+
+const subscribeNever = () => () => {};
+
 function destination(viewer: Viewer): string {
-  const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
-  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
-  return homeFor(viewer.role);
+  return safeNext() ?? homeFor(viewer.role);
 }
 
 export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
@@ -22,6 +35,9 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // The page is prerendered without its query string, so this is read once it reaches the browser.
+  const next = useSyncExternalStore(subscribeNever, safeNext, () => null);
+  const keepNext = (path: string) => (next ? `${path}?next=${encodeURIComponent(next)}` : path);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,14 +113,14 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
                 {mode === "signup" ? (
                   <>
                     Already have an account?{" "}
-                    <Link href="/signin" className="font-bold underline">
+                    <Link href={keepNext("/signin")} className="font-bold underline">
                       Sign in
                     </Link>
                   </>
                 ) : (
                   <>
                     New here?{" "}
-                    <Link href="/signup" className="font-bold underline">
+                    <Link href={keepNext("/signup")} className="font-bold underline">
                       Create an account
                     </Link>
                   </>
