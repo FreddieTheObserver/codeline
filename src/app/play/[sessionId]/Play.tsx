@@ -16,7 +16,7 @@ import { useSessionPush } from "@/lib/realtime";
 import { sfx } from "@/lib/sfx";
 import type { BadgeEarned, PlaceResult, StudentState } from "@/lib/api-types";
 
-type Feedback = { kind: "bloom" | "wilt"; text: string; placementId: string; slotPosition: number; key: number };
+type Feedback = { kind: "bloom" | "wilt"; text: string; placementId: string; slotPosition: number; badges: BadgeEarned[]; key: number };
 
 function readSound(): boolean {
   try {
@@ -58,7 +58,6 @@ export function Play({ sessionId }: { sessionId: string }) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [reason, setReason] = useState("");
   const [reasonSaved, setReasonSaved] = useState(false);
-  const [newBadges, setNewBadges] = useState<BadgeEarned[]>([]);
   const [joinError, setJoinError] = useState("");
   const [placeError, setPlaceError] = useState("");
   const [reasonError, setReasonError] = useState("");
@@ -133,9 +132,9 @@ export function Play({ sessionId }: { sessionId: string }) {
             : "That plot isn't right for this seed. It wilted, so try another.",
           placementId: result.placementId,
           slotPosition: (slot?.position ?? 0) + 1,
+          badges: result.badges,
           key,
         });
-        if (result.badges.length) setNewBadges(result.badges);
         if (sound) {
           lastPlaceSound.current = Date.now();
           (result.correct ? (result.handDone ? sfx.harvest : sfx.sprout) : sfx.wilt)();
@@ -154,11 +153,13 @@ export function Play({ sessionId }: { sessionId: string }) {
 
   async function saveReason() {
     if (!feedback || !reason.trim()) return;
+    const { placementId } = feedback;
     setReasonError("");
     try {
-      const { badges } = await post<{ badges: BadgeEarned[] }>(`/api/placements/${feedback.placementId}/reason`, { reason });
+      const { badges } = await post<{ badges: BadgeEarned[] }>(`/api/placements/${placementId}/reason`, { reason });
       setReasonSaved(true);
-      if (badges.length) setNewBadges(badges);
+      // Only onto the note it belongs to, in case the student planted again while this was saving.
+      if (badges.length) setFeedback((f) => (f?.placementId === placementId ? { ...f, badges: [...f.badges, ...badges] } : f));
     } catch (err) {
       setReasonError(errorText(err));
     }
@@ -179,8 +180,25 @@ export function Play({ sessionId }: { sessionId: string }) {
         <Sprite grid={feedback.kind === "bloom" ? BLOOM : WILT} scale={2} />
         {feedback.text}
       </p>
+      {/* Badges sit with the seed or reason that earned them: on a phone, the top of the page is out of sight. */}
+      <div role="status">
+        {feedback.badges.map((b) => (
+          <p key={b.id} className="mt-2 flex items-center gap-2 bg-[#fff3c4] px-2 py-1" style={{ boxShadow: "0 0 0 2px #e9b949" }}>
+            <Sprite grid={BADGE_ICONS[b.icon] ?? STAR} scale={2} />
+            <span className="min-w-0">
+              <span className="font-pixel">New badge: {b.name}</span>
+              <span className="block text-xs">{b.description}</span>
+            </span>
+          </p>
+        ))}
+      </div>
       {reasonSaved ? (
-        <p className="mt-1 text-sm">Reason saved. Your lecturer can see it.</p>
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm">
+          Reason saved. Your lecturer can see it.
+          <button type="button" className="underline" onClick={() => setFeedback(null)}>
+            Close
+          </button>
+        </p>
       ) : (
         <form
           className="mt-1 flex flex-wrap items-center gap-2"
@@ -248,23 +266,6 @@ export function Play({ sessionId }: { sessionId: string }) {
             Sound {sound ? "on" : "off"}
           </button>
         </Panel>
-
-        {newBadges.length > 0 && (
-          <Panel className="flex flex-wrap items-center gap-3 !bg-[#fff3c4]" role="status">
-            {newBadges.map((b) => (
-              <span key={b.id} className="flex items-center gap-2">
-                <Sprite grid={BADGE_ICONS[b.icon] ?? STAR} scale={3} />
-                <span>
-                  <span className="font-pixel">New badge: {b.name}</span>
-                  <span className="block text-xs">{b.description}</span>
-                </span>
-              </span>
-            ))}
-            <button type="button" className="ml-auto text-sm underline" onClick={() => setNewBadges([])}>
-              Nice
-            </button>
-          </Panel>
-        )}
 
         {session.status === "closed" ? (
           <ClosedView points={me.points} rank={me.rank} of={me.of} />
