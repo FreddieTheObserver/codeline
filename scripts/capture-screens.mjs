@@ -24,10 +24,27 @@ async function actor(loginId, viewport = { width: 1440, height: 900 }) {
   return { context, page, api: context.request };
 }
 
+// Full-page shots grow the viewport to the page first, so sticky bars sit where they belong instead of mid-page.
 async function shot(page, name, { full = false } = {}) {
   await wait(500);
-  await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: full });
+  const viewport = page.viewportSize();
+  if (full) {
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    await page.setViewportSize({ width: viewport.width, height: Math.max(viewport.height, height) });
+    await wait(300);
+  }
+  await page.screenshot({ path: join(OUT, `${name}.png`) });
+  if (full) await page.setViewportSize(viewport);
   console.log("saved", name);
+}
+
+// Confirms the in-app dialog if the last action opened one.
+async function confirmIfAsked(page, label) {
+  const button = page.getByRole("dialog").getByRole("button", { name: label, exact: true });
+  try {
+    await button.waitFor({ state: "visible", timeout: 1500 });
+    await button.click();
+  } catch {}
 }
 
 async function go(page, path) {
@@ -141,7 +158,7 @@ await student.page.click(`button[aria-label^='Plot ${right + 1},']`);
 await wait(700);
 await student.page.fill("input[placeholder^='Why plot']", "We need the scores before we can look for the biggest one.");
 await shot(student.page, "33-play-bloom-why");
-await student.page.click("text=Save");
+await student.page.getByRole("button", { name: "Save", exact: true }).click();
 await wait(600);
 await go(phone.page, `/play/${sid}`);
 await shot(phone.page, "34-play-phone");
@@ -174,6 +191,7 @@ for (let i = 0; i < 3; i++) {
   await wait(600);
 }
 await consolePage.click("text=Reveal solution");
+await confirmIfAsked(consolePage, "Reveal solution");
 await wait(1500);
 await go(student.page, `/play/${sid}`);
 await shot(student.page, "38-play-result-reveal", { full: true });
