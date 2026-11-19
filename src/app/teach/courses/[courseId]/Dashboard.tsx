@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { EmptyState, ErrorNote, Heading, Loading, Panel, Tag, pct } from "@/components/ui";
 import { useApi } from "@/lib/client";
-import type { CourseDashboard, DashboardStudent } from "@/lib/api-types";
+import { sortBy } from "@/lib/sort";
+import type { CourseDashboard } from "@/lib/api-types";
 
 type SortKey = "name" | "rounds" | "firstTryRate" | "avgRetries" | "points";
 
@@ -29,12 +30,7 @@ export function Dashboard({ courseId }: { courseId: string }) {
 
   const students = useMemo(() => {
     const list = (data?.students ?? []).filter((s) => !hideSimulated || !s.isSimulated);
-    const val = (s: DashboardStudent) => (sort.key === "name" ? s.name : (s[sort.key] ?? -1));
-    return [...list].sort((a, b) => {
-      const x = val(a);
-      const y = val(b);
-      return (x < y ? -1 : x > y ? 1 : 0) * sort.dir;
-    });
+    return sortBy(list, (s) => s[sort.key], sort.dir, (a, b) => a.name.localeCompare(b.name));
   }, [data, sort, hideSimulated]);
 
   if (error) return <ErrorNote>{error.message}</ErrorNote>;
