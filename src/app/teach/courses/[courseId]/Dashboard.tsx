@@ -9,6 +9,9 @@ import type { CourseDashboard } from "@/lib/api-types";
 
 type SortKey = "name" | "rounds" | "firstTryRate" | "avgRetries" | "points";
 
+const STUDENT_CELL = "sticky left-0 z-10 bg-parchment pr-3";
+const NUMBER_CELL = "whitespace-nowrap px-2 text-right tabular-nums";
+
 function Trend({ values }: { values: number[] }) {
   if (values.length < 2) return <span className="text-xs text-ink-soft">-</span>;
   const max = Math.max(...values, 1);
@@ -37,12 +40,12 @@ export function Dashboard({ courseId }: { courseId: string }) {
   if (!data) return <Loading label="Counting the harvest..." />;
   const exercise = data.exercises.find((e) => e.exerciseId === exerciseId) ?? data.exercises[0];
 
-  const header = (key: SortKey, label: string, right?: boolean) => (
-    <th className={right ? "text-right" : "text-left"}>
+  const header = (key: SortKey, label: string, className: string) => (
+    <th className={className} aria-sort={sort.key === key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}>
       <button
-        className="font-bold underline decoration-dotted"
+        type="button"
+        className="whitespace-nowrap font-bold underline decoration-dotted"
         onClick={() => setSort((s) => ({ key, dir: s.key === key ? ((-s.dir) as 1 | -1) : key === "name" ? 1 : -1 }))}
-        aria-sort={sort.key === key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}
       >
         {label}
         {sort.key === key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
@@ -51,7 +54,7 @@ export function Dashboard({ courseId }: { courseId: string }) {
   );
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <Panel>
         <Heading>Hardest steps</Heading>
         <p className="text-sm">Share of students right on the first try, and where they most often put the line instead. Use it to decide what to reteach.</p>
@@ -102,15 +105,15 @@ export function Dashboard({ courseId }: { courseId: string }) {
           </label>
         </div>
         <div className="mt-2 max-h-[640px] overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-parchment">
-              <tr>
-                {header("name", "Student")}
-                {header("rounds", "Rounds", true)}
-                {header("firstTryRate", "First try", true)}
-                {header("avgRetries", "Retries", true)}
-                {header("points", "Points", true)}
-                <th className="pl-2 text-left">Trend</th>
+          <table className="w-full min-w-[440px] text-sm">
+            <thead className="sticky top-0 z-20 bg-parchment">
+              <tr className="border-b-2 border-parchment-dark">
+                {header("name", "Student", `${STUDENT_CELL} py-1.5 text-left`)}
+                {header("rounds", "Rounds", `${NUMBER_CELL} py-1.5`)}
+                {header("firstTryRate", "First try", `${NUMBER_CELL} py-1.5`)}
+                {header("avgRetries", "Retries", `${NUMBER_CELL} py-1.5`)}
+                {header("points", "Points", `${NUMBER_CELL} py-1.5`)}
+                <th className="hidden py-1.5 pl-3 text-left sm:table-cell">Trend</th>
               </tr>
             </thead>
             <tbody>
@@ -123,18 +126,18 @@ export function Dashboard({ courseId }: { courseId: string }) {
               )}
               {students.map((s) => (
                 <tr key={s.userId} className="border-t border-parchment-dark">
-                  <td className="py-1.5 pr-2">
+                  <td className={`${STUDENT_CELL} py-1.5`}>
                     <Link href={`/teach/courses/${courseId}/students/${s.userId}`} className="font-bold underline">
                       {s.name}
                     </Link>
                     {s.isSimulated && <Tag className="ml-1">simulated</Tag>}
                     <span className="block text-xs text-ink-soft">{s.nickname}</span>
                   </td>
-                  <td className="text-right">{s.rounds}</td>
-                  <td className="text-right">{pct(s.firstTryRate)}</td>
-                  <td className="text-right">{s.avgRetries === null ? "-" : s.avgRetries.toFixed(1)}</td>
-                  <td className="text-right font-bold">{s.points.toLocaleString()}</td>
-                  <td className="pl-2">
+                  <td className={NUMBER_CELL}>{s.rounds}</td>
+                  <td className={NUMBER_CELL}>{pct(s.firstTryRate)}</td>
+                  <td className={NUMBER_CELL}>{s.avgRetries === null ? "-" : s.avgRetries.toFixed(1)}</td>
+                  <td className={`${NUMBER_CELL} font-bold`}>{s.points.toLocaleString()}</td>
+                  <td className="hidden pl-3 sm:table-cell">
                     <Trend values={s.trend} />
                   </td>
                 </tr>

@@ -11,7 +11,8 @@ type RoundDraft = { key: number; exerciseId: string; minutes: number };
 let roundKey = 0;
 const draft = (exerciseId: string): RoundDraft => ({ key: ++roundKey, exerciseId, minutes: 3 });
 
-const ROW = "grid grid-cols-[2rem_minmax(0,1fr)_6.5rem_auto] items-center gap-x-2";
+// On one phone-width line the buttons squeeze the Exercise select down to its arrow.
+const ROW = "grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-2 sm:grid-cols-[2rem_minmax(0,1fr)_6.5rem_auto]";
 
 export function SessionSetup({ detail, onCreated }: { detail: CourseDetail; onCreated: (id: string) => void }) {
   const confirm = useConfirm();
@@ -136,7 +137,7 @@ export function SessionSetup({ detail, onCreated }: { detail: CourseDetail; onCr
       </div>
 
       <h3 className="mt-6 font-pixel text-lg">Rounds</h3>
-      <div className={`${ROW} mt-2 px-2 text-xs font-bold`} aria-hidden="true">
+      <div className={`${ROW} mt-2 hidden px-2 text-xs font-bold sm:grid`} aria-hidden="true">
         <span>#</span>
         <span>Exercise</span>
         <span>Minutes</span>
@@ -145,24 +146,27 @@ export function SessionSetup({ detail, onCreated }: { detail: CourseDetail; onCr
       <ol className="mt-1 flex flex-col gap-2">
         {rounds.map((r, i) => (
           <li key={r.key} className={`${ROW} px-row px-2 py-1`}>
-            <span className="text-center font-pixel text-xl">{i + 1}</span>
-            <select className="px-input" value={r.exerciseId} onChange={(e) => update(i, { exerciseId: e.target.value })} aria-label={`Exercise for Round ${i + 1}`}>
+            <span className="row-span-2 text-center font-pixel text-xl sm:row-span-1">{i + 1}</span>
+            <select className="px-input col-span-2 sm:col-span-1" value={r.exerciseId} onChange={(e) => update(i, { exerciseId: e.target.value })} aria-label={`Exercise for Round ${i + 1}`}>
               {playable.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.title} ({e.dealable} seeds)
                 </option>
               ))}
             </select>
-            <input
-              type="number"
-              min={0.5}
-              max={30}
-              step={0.5}
-              value={r.minutes}
-              onChange={(e) => update(i, { minutes: Math.max(0.5, Math.min(30, Number(e.target.value) || 1)) })}
-              className="px-input"
-              aria-label={`Minutes for Round ${i + 1}`}
-            />
+            <label className="flex items-center gap-2">
+              <span className="text-xs font-bold sm:sr-only">Minutes</span>
+              <input
+                type="number"
+                min={0.5}
+                max={30}
+                step={0.5}
+                value={r.minutes}
+                onChange={(e) => update(i, { minutes: Math.max(0.5, Math.min(30, Number(e.target.value) || 1)) })}
+                className="px-input min-w-0 flex-1"
+                aria-label={`Minutes for Round ${i + 1}`}
+              />
+            </label>
             <span className="flex gap-1">
               <button type="button" className="px-btn px-btn-secondary !px-2 !py-1" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move Round ${i + 1} up`}>
                 ↑
