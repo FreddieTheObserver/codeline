@@ -73,10 +73,11 @@ const processes = [
   {
     title: "6. Close and review progress",
     actor: "Lecturer and student",
-    summary: "Closing the Session turns points into lasting XP. The lecturer's dashboard shows each student's progress and the steps the class finds hardest.",
+    summary: "Closing the Session turns points into lasting XP. The lecturer looks back on each Round of the Session, and the course dashboard shows each student's progress and the steps the class finds hardest.",
     screens: [
       { file: "40-projector-finale", title: "Projector: finale", text: "The final noticeboard.", src: [P("Team proposal")] },
       { file: "42-profile", title: "Student profile", text: "Level, avatar items, Badges and the Almanac of harvested Exercises.", src: [P("Codedex-style progression: team proposal")] },
+      { file: "43-session-summary", title: "Session summary", text: "Each Round of a closed Session: hardest steps, every decision with its reason, and each student's points.", src: [S("S1-LEC-09"), S("S1-HOD-12")] },
       { file: "50-dashboard", title: "Course dashboard", text: "Hardest steps with the most common wrong step; a sortable student table with trends.", src: [S("S1-HOD-12"), S("S1-HOD-07")] },
       { file: "51-student-detail", title: "One student", text: "Every Placement, try and reason across the course.", src: [S("S1-LEC-09"), S("S1-HOD-12")] },
     ],

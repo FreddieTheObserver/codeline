@@ -209,6 +209,8 @@ await go(student.page, `/play/${sid}`);
 await shot(student.page, "41-play-closed");
 await go(student.page, "/profile");
 await shot(student.page, "42-profile", { full: true });
+await go(lecturer.page, `/teach/courses/${csc101.id}/sessions/${sid}`);
+await shot(lecturer.page, "43-session-summary", { full: true });
 await go(lecturer.page, `/teach/courses/${csc101.id}`);
 await lecturer.page.click("role=tab[name='Dashboard']");
 await wait(1200);
