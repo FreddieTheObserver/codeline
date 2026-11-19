@@ -1,13 +1,25 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 
 // Matches --motion-exit in globals.css.
 export const EXIT_MS = 150;
 
 // CSS animations obey the reduced-motion rule in globals.css by themselves; motion driven from script must ask.
+const REDUCED = "(prefers-reduced-motion: reduce)";
+
 function reducedMotion() {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return window.matchMedia(REDUCED).matches;
+}
+
+function subscribeReducedMotion(onChange: () => void) {
+  const query = window.matchMedia(REDUCED);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function useReducedMotion() {
+  return useSyncExternalStore(subscribeReducedMotion, reducedMotion, () => false);
 }
 
 function slowMotion() {
@@ -54,22 +66,27 @@ export function useFlip(list: RefObject<HTMLElement | null>, order: string) {
   }, [list, order]);
 }
 
-// Counts to a new value instead of jumping to it.
+// Counts to a new value instead of jumping to it. Under reduced motion the new value shows in the same render,
+// not on an animation frame, which browsers pause for pages that aren't in front.
 export function CountUp({ value }: { value: number }) {
+  const reduced = useReducedMotion();
   const [shown, setShown] = useState(value);
   const current = useRef(value);
   useEffect(() => {
     const from = current.current;
-    if (from === value) return;
-    const length = reducedMotion() ? 0 : slowMotion().duration;
+    if (reduced || from === value) {
+      current.current = value;
+      return;
+    }
+    const { duration } = slowMotion();
     const start = performance.now();
     let frame = requestAnimationFrame(function step(now) {
-      const t = length ? Math.min(1, (now - start) / length) : 1;
+      const t = Math.min(1, (now - start) / duration);
       current.current = Math.round(from + (value - from) * (1 - (1 - t) ** 3));
       setShown(current.current);
       if (t < 1) frame = requestAnimationFrame(step);
     });
     return () => cancelAnimationFrame(frame);
-  }, [value]);
-  return <>{shown.toLocaleString()}</>;
+  }, [value, reduced]);
+  return <>{(reduced ? value : shown).toLocaleString()}</>;
 }
