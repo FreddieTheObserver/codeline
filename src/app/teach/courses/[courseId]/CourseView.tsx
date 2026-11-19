@@ -37,12 +37,29 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
     { id: "dashboard", label: "Dashboard", show: true },
     { id: "sessions", label: "Past Sessions", show: true },
   ];
-  const current = tabs.find((t) => t.id === tab && t.show)?.id ?? "exercises";
+  const visibleTabs = tabs.filter((t) => t.show);
+  const current = visibleTabs.find((t) => t.id === tab)?.id ?? "exercises";
 
   function select(next: CourseTab) {
     setTab(next);
     // Keeps the tab in the URL, so Back and the breadcrumbs on other pages return to it.
     window.history.replaceState(null, "", courseHref(courseId, next));
+  }
+
+  function moveTab(e: React.KeyboardEvent<HTMLDivElement>) {
+    const at = visibleTabs.findIndex((t) => t.id === current);
+    const count = visibleTabs.length;
+    const to =
+      e.key === "ArrowRight" ? (at + 1) % count
+      : e.key === "ArrowLeft" ? (at - 1 + count) % count
+      : e.key === "Home" ? 0
+      : e.key === "End" ? count - 1
+      : null;
+    if (to === null) return;
+    e.preventDefault();
+    const next = visibleTabs[to].id;
+    select(next);
+    document.getElementById(`tab-${next}`)?.focus();
   }
 
   async function duplicate(id: string, title: string) {
@@ -90,27 +107,28 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
         </Panel>
       )}
 
-      <div className="flex flex-wrap gap-1" role="tablist" aria-label="Course sections">
-        {tabs
-          .filter((t) => t.show)
-          .map((t) => (
-            <button
-              key={t.id}
-              id={`tab-${t.id}`}
-              type="button"
-              role="tab"
-              aria-selected={current === t.id}
-              aria-controls={`panel-${t.id}`}
-              onClick={() => select(t.id)}
-              className={cx("px-btn", current === t.id ? "px-btn-sun" : "px-btn-secondary")}
-            >
-              {t.label}
-            </button>
-          ))}
+      {/* The standard tabs pattern: only the selected tab is a Tab stop, and the arrow keys, Home and End move between tabs. */}
+      <div className="flex flex-wrap gap-1" role="tablist" aria-label="Course sections" onKeyDown={moveTab}>
+        {visibleTabs.map((t) => (
+          <button
+            key={t.id}
+            id={`tab-${t.id}`}
+            type="button"
+            role="tab"
+            aria-selected={current === t.id}
+            aria-controls="course-panel"
+            tabIndex={current === t.id ? 0 : -1}
+            onClick={() => select(t.id)}
+            className={cx("px-btn", current === t.id ? "px-btn-sun" : "px-btn-secondary")}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
       <ErrorNote>{actionError}</ErrorNote>
 
-      <div className="mt-3" role="tabpanel" id={`panel-${current}`} aria-labelledby={`tab-${current}`}>
+      {/* Focusable because some panels open with plain text rather than a control. */}
+      <div className="mt-3" role="tabpanel" id="course-panel" aria-labelledby={`tab-${current}`} tabIndex={0}>
         {current === "exercises" && (
           <Panel>
             <div className="flex flex-wrap items-center justify-between gap-2">
