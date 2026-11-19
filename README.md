@@ -42,6 +42,7 @@ node scripts/ui-check.mjs       # browser checks: dialogs, sign-in and sign-out,
 ```
 
 Both end-to-end checks create data, so run them only against a local database, then reseed.
+They and the capture script stop if the address isn't on this machine, unless `--allow-remote` is the last argument.
 
 ## Deploy
 

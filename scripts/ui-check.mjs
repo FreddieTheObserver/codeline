@@ -3,8 +3,10 @@
 // Usage: node scripts/ui-check.mjs [baseUrl]. Run it against a local, seeded database: it creates a course and an Exercise.
 // Hidden pages stay in the DOM, so CSS selectors here are limited to :visible elements.
 import { chromium } from "playwright";
+import { requireLocalServer } from "./local-only.mjs";
 
 const BASE = process.argv[2] ?? "http://localhost:3210";
+requireLocalServer(BASE);
 const PASSWORD = "codeline-demo";
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const failures = [];

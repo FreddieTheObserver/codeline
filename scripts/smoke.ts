@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- a throwaway HTTP probe, typed loosely on purpose */
 // End-to-end smoke test of the live loop against a running server.
 // Usage: BASE_URL=http://localhost:3210 bun scripts/smoke.ts
+import { requireLocalServer } from "./local-only.mjs";
+
 const BASE = process.env.BASE_URL ?? "http://localhost:3210";
+requireLocalServer(BASE);
 
 class Client {
   cookie = "";

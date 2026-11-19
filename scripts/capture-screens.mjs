@@ -4,8 +4,10 @@
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { requireLocalServer } from "./local-only.mjs";
 
 const BASE = process.argv[2] ?? "http://localhost:3210";
+requireLocalServer(BASE);
 const OUT = process.argv[3] ?? "screens";
 mkdirSync(OUT, { recursive: true });
 const PASSWORD = "codeline-demo";
