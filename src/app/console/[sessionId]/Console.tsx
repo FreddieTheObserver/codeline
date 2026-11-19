@@ -6,9 +6,9 @@ import { SunTimer } from "@/components/garden/SunTimer";
 import { PageShell } from "@/components/PageShell";
 import { Sprite } from "@/components/pixel/Sprite";
 import { BLOOM, WILT } from "@/components/pixel/sprites";
-import { Button, ButtonLink, EmptyState, ErrorNote, ErrorState, Heading, LanguageTag, Loading, Meter, PageHeader, Panel, Tag, pct } from "@/components/ui";
+import { Button, ButtonLink, EmptyState, ErrorNote, ErrorState, Heading, LanguageTag, Loading, Meter, PageHeader, Panel, Tag, cx, pct } from "@/components/ui";
 import { errorText, post, useApi } from "@/lib/client";
-import { serverOffset, useCountdown } from "@/lib/clock";
+import { formatClock, serverOffset, useCountdown } from "@/lib/clock";
 import type { ConsolePlacement, ConsoleState, ControlAction, RoundStatus } from "@/lib/api-types";
 import { TEAM_COLORS, TEAM_NAMES } from "@/domain/teams";
 import { courseHref } from "@/app/teach/courses/[courseId]/tabs";
@@ -202,6 +202,94 @@ export function Console({ sessionId }: { sessionId: string }) {
     }
   }
 
+  // The panel shows full labels on a laptop; the phone bar uses short ones to fit one thumb-width row.
+  const roundButtons = (short: boolean) => (
+    <>
+      {(!round || (!live && hasNext)) && (
+        <Button tone={!round || status === "revealed" ? "sun" : "secondary"} disabled={busy} onClick={start}>
+          Start Round {round ? nextNo : 1}
+        </Button>
+      )}
+      {status === "running" && (
+        <Button tone="secondary" disabled={busy} onClick={() => run("pause", "Round paused.")}>
+          Pause
+        </Button>
+      )}
+      {status === "paused" && (
+        <Button disabled={busy} onClick={() => run("resume", "Round resumed.")}>
+          Resume
+        </Button>
+      )}
+      {live && (
+        <Button tone="secondary" disabled={busy} onClick={endRound}>
+          {short ? "End" : "End Round"}
+        </Button>
+      )}
+      {round && status !== "revealed" && (
+        <Button tone={status === "ended" ? "sun" : "secondary"} disabled={busy} onClick={reveal}>
+          {short ? "Reveal" : "Reveal solution"}
+        </Button>
+      )}
+    </>
+  );
+
+  const hardestSteps = (className: string) =>
+    data.stats.length > 0 && (
+      <Panel className={className}>
+        <Heading>Hardest steps right now</Heading>
+        <ul className="mt-2 flex flex-col gap-2">
+          {[...data.stats]
+            .filter((s) => s.heldBy > 0)
+            .sort((a, b) => (a.firstTryRate ?? 1) - (b.firstTryRate ?? 1))
+            .slice(0, 5)
+            .map((s) => (
+              <li key={s.slotId} className="text-sm">
+                <div className="flex justify-between gap-2 font-bold">
+                  <span>
+                    Step {s.position + 1}: {s.pseudocode}
+                  </span>
+                  <span className="whitespace-nowrap">{pct(s.firstTryRate)} first try</span>
+                </div>
+                {s.commonWrong && (
+                  <p className="text-xs text-ink-soft">
+                    {Math.round(s.commonWrong.share * 100)}% of holders put it at step {s.commonWrong.position + 1} ({s.commonWrong.pseudocode}) first.
+                  </p>
+                )}
+              </li>
+            ))}
+        </ul>
+      </Panel>
+    );
+
+  const demoTool = (className: string) =>
+    !closed && (
+      <Panel className={cx("!bg-[#eef3f8]", className)}>
+        <Heading>Demo tool: simulated students</Heading>
+        <p className="text-xs">For demos only. Simulated students are marked in every table and export.</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            max={60}
+            value={botCount}
+            onChange={(e) => setBotCount(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+            className="px-input !w-20"
+            aria-label="How many simulated students"
+          />
+          <Button tone="water" disabled={busy} onClick={addBots}>
+            Add
+          </Button>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={botsOn} onChange={(e) => setBotsOn(e.target.checked)} /> They keep playing
+          </label>
+        </div>
+      </Panel>
+    );
+
+  const barStatus = !round
+    ? `Lobby · ${session.participants} ${session.participants === 1 ? "student" : "students"}`
+    : `Round ${roundNo} · ${status === "running" ? formatClock(left) : status === "revealed" ? "solution shown" : ROUND_STATUS[round.timer.status].label}`;
+
   const hint = closed
     ? "This Session has closed."
     : !round
@@ -235,43 +323,19 @@ export function Console({ sessionId }: { sessionId: string }) {
         }
       />
 
+      {/* Below lg the columns stack, so on a phone the decisions list comes before the slower-moving panels
+          and the Round buttons live in a bar pinned to the bottom instead of in this panel. */}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="flex flex-col gap-4">
-          <Panel>
+          <Panel id="round-controls">
             <Heading>Round controls</Heading>
             <p className="mt-1 text-sm" role="status">
               {hint}
             </p>
-            {!closed && (
-              <div className="mt-3 flex flex-wrap gap-1">
-                {(!round || (!live && hasNext)) && (
-                  <Button tone={!round || status === "revealed" ? "sun" : "secondary"} disabled={busy} onClick={start}>
-                    Start Round {round ? nextNo : 1}
-                  </Button>
-                )}
-                {status === "running" && (
-                  <Button tone="secondary" disabled={busy} onClick={() => run("pause", "Round paused.")}>
-                    Pause
-                  </Button>
-                )}
-                {status === "paused" && (
-                  <Button disabled={busy} onClick={() => run("resume", "Round resumed.")}>
-                    Resume
-                  </Button>
-                )}
-                {live && (
-                  <Button tone="secondary" disabled={busy} onClick={endRound}>
-                    End Round
-                  </Button>
-                )}
-                {round && status !== "revealed" && (
-                  <Button tone={status === "ended" ? "sun" : "secondary"} disabled={busy} onClick={reveal}>
-                    Reveal solution
-                  </Button>
-                )}
-              </div>
-            )}
-            <ErrorNote>{actionError}</ErrorNote>
+            {!closed && <div className="mt-3 hidden flex-wrap gap-1 lg:flex">{roundButtons(false)}</div>}
+            <div className={cx(!closed && "hidden lg:block")}>
+              <ErrorNote>{actionError}</ErrorNote>
+            </div>
             {!closed && (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-parchment-dark pt-3">
                 <p className="text-xs text-ink-soft">Closing ends the Session for everyone and turns points into XP.</p>
@@ -320,56 +384,8 @@ export function Console({ sessionId }: { sessionId: string }) {
             </Panel>
           )}
 
-          {data.stats.length > 0 && (
-            <Panel>
-              <Heading>Hardest steps right now</Heading>
-              <ul className="mt-2 flex flex-col gap-2">
-                {[...data.stats]
-                  .filter((s) => s.heldBy > 0)
-                  .sort((a, b) => (a.firstTryRate ?? 1) - (b.firstTryRate ?? 1))
-                  .slice(0, 5)
-                  .map((s) => (
-                    <li key={s.slotId} className="text-sm">
-                      <div className="flex justify-between gap-2 font-bold">
-                        <span>
-                          Step {s.position + 1}: {s.pseudocode}
-                        </span>
-                        <span className="whitespace-nowrap">{pct(s.firstTryRate)} first try</span>
-                      </div>
-                      {s.commonWrong && (
-                        <p className="text-xs text-ink-soft">
-                          {Math.round(s.commonWrong.share * 100)}% of holders put it at step {s.commonWrong.position + 1} ({s.commonWrong.pseudocode}) first.
-                        </p>
-                      )}
-                    </li>
-                  ))}
-              </ul>
-            </Panel>
-          )}
-
-          {!closed && (
-            <Panel className="!bg-[#eef3f8]">
-              <Heading>Demo tool: simulated students</Heading>
-              <p className="text-xs">For demos only. Simulated students are marked in every table and export.</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={botCount}
-                  onChange={(e) => setBotCount(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
-                  className="px-input !w-20"
-                  aria-label="How many simulated students"
-                />
-                <Button tone="water" disabled={busy} onClick={addBots}>
-                  Add
-                </Button>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={botsOn} onChange={(e) => setBotsOn(e.target.checked)} /> They keep playing
-                </label>
-              </div>
-            </Panel>
-          )}
+          {hardestSteps("hidden lg:block")}
+          {demoTool("hidden lg:block")}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -407,6 +423,8 @@ export function Console({ sessionId }: { sessionId: string }) {
               ))}
             </ul>
           </Panel>
+
+          {hardestSteps("lg:hidden")}
 
           <Panel>
             <Heading>Students ({data.participants.length})</Heading>
@@ -463,8 +481,30 @@ export function Console({ sessionId }: { sessionId: string }) {
               </table>
             </div>
           </Panel>
+
+          {demoTool("lg:hidden")}
         </div>
       </div>
+
+      {!closed && (
+        <div className="sticky bottom-0 z-20 mt-4 lg:hidden">
+          <div className="px-panel px-panel-wood !mx-1 !mb-1 p-2">
+            <ErrorNote>{actionError}</ErrorNote>
+            <div className="flex flex-wrap items-center justify-between gap-x-2">
+              <p className="px-1 font-pixel text-lg">{barStatus}</p>
+              <div className="flex flex-wrap justify-end gap-x-1">
+                {status === "revealed" && !hasNext ? (
+                  <a href="#round-controls" className="px-1 py-2 text-sm font-bold underline">
+                    Close the Session
+                  </a>
+                ) : (
+                  roundButtons(true)
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </PageShell>
   );
 }
