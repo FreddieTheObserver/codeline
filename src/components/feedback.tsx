@@ -104,10 +104,11 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       {children}
       {request?.kind === "confirm" && <ConfirmDialog key={request.id} options={request.options} onDone={(ok) => finish(request, ok)} />}
       {request?.kind === "prompt" && <PromptDialog key={request.id} options={request.options} onDone={(v) => finish(request, v)} />}
+      {/* On phones the bottom edge belongs to sticky bars such as the seed pouch, so messages appear at the top there. */}
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-center gap-2 sm:inset-x-auto sm:right-6 sm:items-end"
+        className="pointer-events-none fixed inset-x-4 top-4 z-50 flex flex-col items-center gap-2 sm:inset-x-auto sm:top-auto sm:right-6 sm:bottom-4 sm:items-end"
       >
         {toasts.map((t) => (
           <div

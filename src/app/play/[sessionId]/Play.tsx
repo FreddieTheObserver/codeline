@@ -9,7 +9,7 @@ import { SunTimer } from "@/components/garden/SunTimer";
 import { Avatar } from "@/components/pixel/Avatar";
 import { Sprite } from "@/components/pixel/Sprite";
 import { BADGE_ICONS, BASKET, BLOOM, SPROUT, STAR, WILT } from "@/components/pixel/sprites";
-import { Button, ButtonLink, ErrorNote, ErrorState, LanguageTag, Loading, Panel, Tag } from "@/components/ui";
+import { Button, ButtonLink, ErrorNote, ErrorState, Heading, LanguageTag, Loading, Panel, Tag } from "@/components/ui";
 import { errorText, post, useApi } from "@/lib/client";
 import { serverOffset, useCountdown } from "@/lib/clock";
 import { useSessionPush } from "@/lib/realtime";
@@ -59,21 +59,24 @@ export function Play({ sessionId }: { sessionId: string }) {
   const [reason, setReason] = useState("");
   const [reasonSaved, setReasonSaved] = useState(false);
   const [newBadges, setNewBadges] = useState<BadgeEarned[]>([]);
+  const [joinError, setJoinError] = useState("");
   const [placeError, setPlaceError] = useState("");
+  const [reasonError, setReasonError] = useState("");
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useSound();
   const joining = useRef(false);
 
+  // A failed join waits for the student to try again rather than retrying on every poll.
   useEffect(() => {
-    if (!data || data.me.joined || data.session.status === "closed" || joining.current) return;
+    if (!data || data.me.joined || data.session.status === "closed" || joining.current || joinError) return;
     joining.current = true;
     post(`/api/sessions/${sessionId}/join`)
       .then(() => mutate())
-      .catch((err) => setPlaceError(errorText(err)))
+      .catch((err) => setJoinError(errorText(err)))
       .finally(() => {
         joining.current = false;
       });
-  }, [data, sessionId, mutate]);
+  }, [data, sessionId, mutate, joinError]);
 
   const round = data?.round ?? null;
   const left = useCountdown(round?.timer, offset, () => void mutate());
@@ -91,6 +94,7 @@ export function Play({ sessionId }: { sessionId: string }) {
     if (status === "running" && lastStatus.current !== "paused") {
       setFeedback(null);
       setSelected(null);
+      setPlaceError("");
     }
     lastStatus.current = status;
   }, [round?.timer.status, sound]);
@@ -121,6 +125,7 @@ export function Play({ sessionId }: { sessionId: string }) {
         setFlash({ slotId, kind: result.correct ? "bloom" : "wilt", key });
         setReason("");
         setReasonSaved(false);
+        setReasonError("");
         setFeedback({
           kind: result.correct ? "bloom" : "wilt",
           text: result.correct
@@ -149,12 +154,13 @@ export function Play({ sessionId }: { sessionId: string }) {
 
   async function saveReason() {
     if (!feedback || !reason.trim()) return;
+    setReasonError("");
     try {
       const { badges } = await post<{ badges: BadgeEarned[] }>(`/api/placements/${feedback.placementId}/reason`, { reason });
       setReasonSaved(true);
       if (badges.length) setNewBadges(badges);
     } catch (err) {
-      setPlaceError(errorText(err));
+      setReasonError(errorText(err));
     }
   }
 
@@ -201,8 +207,10 @@ export function Play({ sessionId }: { sessionId: string }) {
           </button>
         </form>
       )}
+      <ErrorNote>{reasonError}</ErrorNote>
     </div>
   );
+  const roundOver = status === "ended" || status === "revealed";
 
   return (
     <PageShell>
@@ -260,6 +268,8 @@ export function Play({ sessionId }: { sessionId: string }) {
 
         {session.status === "closed" ? (
           <ClosedView points={me.points} rank={me.rank} of={me.of} />
+        ) : !me.joined ? (
+          <JoiningView error={joinError} onRetry={() => setJoinError("")} />
         ) : !round ? (
           <LobbyView nickname={me.nickname} count={me.of} />
         ) : (
@@ -270,11 +280,14 @@ export function Play({ sessionId }: { sessionId: string }) {
                 Your lecturer paused the Round. Take a breath.
               </Panel>
             )}
-            {(status === "ended" || status === "revealed") && data.result && (
-              <ResultView result={data.result} revealed={round.revealed} />
+            {roundOver && data.result && <ResultView result={data.result} revealed={round.revealed} />}
+            {roundOver && (feedbackBox || placeError) && (
+              <Panel className="!p-2">
+                <ErrorNote>{placeError}</ErrorNote>
+                {feedbackBox}
+              </Panel>
             )}
-            {(status === "ended" || status === "revealed") && feedbackBox && <Panel className="!p-2">{feedbackBox}</Panel>}
-            {(status === "ended" || status === "revealed") && !data.result && (
+            {roundOver && !data.result && (
               <Panel className="text-center font-pixel" role="status">
                 You joined after this Round was dealt. Your seeds come with the next Round.
               </Panel>
@@ -286,9 +299,18 @@ export function Play({ sessionId }: { sessionId: string }) {
               onPlot={status === "running" ? (id) => void place(id) : undefined}
               onDropCard={status === "running" ? (id, card) => void place(id, card) : undefined}
             />
-            <ErrorNote>{placeError}</ErrorNote>
             {status === "running" || status === "paused" ? (
-              <HandTray cards={handCards} selected={selected} onSelect={(id) => { setSelected(id); if (sound && id) sfx.tap(); }} disabled={status !== "running" || busy}>
+              <HandTray
+                cards={handCards}
+                selected={selected}
+                onSelect={(id) => {
+                  setSelected(id);
+                  setPlaceError("");
+                  if (sound && id) sfx.tap();
+                }}
+                disabled={status !== "running" || busy}
+              >
+                <ErrorNote>{placeError}</ErrorNote>
                 {feedbackBox}
                 {handDone && (
                   <p className="mb-2 flex items-center gap-2 font-pixel text-parchment">
@@ -301,6 +323,22 @@ export function Play({ sessionId }: { sessionId: string }) {
         )}
       </div>
     </PageShell>
+  );
+}
+
+function JoiningView({ error, onRetry }: { error: string; onRetry: () => void }) {
+  if (!error) return <Loading label="Opening the gate..." />;
+  return (
+    <Panel className="mx-auto w-full max-w-xl">
+      <Heading>You&apos;re not in yet</Heading>
+      <ErrorNote>{error}</ErrorNote>
+      <div className="flex flex-wrap gap-1">
+        <Button onClick={onRetry}>Try again</Button>
+        <ButtonLink href="/home" tone="secondary">
+          Back to your valley
+        </ButtonLink>
+      </div>
+    </Panel>
   );
 }
 

@@ -234,10 +234,17 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 @keyframes toast-in {
-  from { transform: translateY(12px); opacity: 0; }
+  from { transform: translateY(var(--toast-from, 12px)); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
-.anim-toast { animation: toast-in 180ms ease-out both; }
+/* Toasts sit at the top on phones and at the bottom from sm up, so they slide in from that edge. */
+.anim-toast {
+  --toast-from: -12px;
+  animation: toast-in 180ms ease-out both;
+  @variant sm {
+    --toast-from: 12px;
+  }
+}
 .anim-sprout { animation: sprout-pop 420ms ease-out both; }
 .anim-wilt { animation: wilt-shake 420ms ease-in-out; }
 .anim-float { animation: float-up 1100ms ease-out forwards; }
