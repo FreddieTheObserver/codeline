@@ -99,6 +99,14 @@ const future = [
   ["200 students at the same time", "S1-IT-03", "The free hosting tier fits about 90 per Session; 200 needs the paid tier or a dedicated room server."],
 ];
 
+const team = [
+  ["Phapawarin Wongwuttipong", "68130500848"],
+  ["Theeranthorn Hemakunseht", "68130500864"],
+  ["Nontawat Kittiwiwat", "68130500816"],
+  ["Kyaw Zall Thwin", "68130500828"],
+  ["La Yaung Phyo", "68130500852"],
+];
+
 const img = (name) => {
   const path = join(SCREENS, `${name}.png`);
   if (!existsSync(path)) throw new Error(`Missing screenshot ${path}`);
@@ -133,7 +141,9 @@ const processPages = processes
   )
   .join("");
 
+// Without a title, Chromium names the PDF after the blank page it was printed from, so viewers show "about:blank".
 const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>CodeLine · CSC213 UI Prototype</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
@@ -165,13 +175,17 @@ const html = `<!doctype html><html><head><meta charset="utf-8">
   .cover .card { background: #fbf3df; border: 3px solid #7a4f2c; padding: 7mm 9mm; display: grid; grid-template-columns: 1fr auto; gap: 8mm; align-items: center; }
   .cover code { font-size: 12pt; background: #ecdcb6; padding: .3mm 1.5mm; }
   .legend { display: flex; gap: 6mm; font-size: 10pt; align-items: center; flex-wrap: wrap; }
+  .team { margin-top: 2mm; display: grid; grid-template-columns: auto auto; justify-content: start; gap: 1.2mm 8mm; font-size: 12pt; }
+  .team code { font-size: 12pt; }
   table { width: 100%; border-collapse: collapse; font-size: 10pt; }
   th, td { text-align: left; padding: 1.6mm 2mm; border-bottom: 1px solid #c9b48a; vertical-align: top; }
   th { font-family: "Pixelify Sans", monospace; font-weight: 500; }
 </style></head><body>
   <section class="page cover">
     <div><p class="kicker">CSC213 Term Project 2 · User interface deliverable</p><h1>CodeLine</h1>
-      <p style="font-size:15pt;margin:2mm 0 0;max-width:200mm">An interactive prototype: students turn an algorithm in plain words into code by planting each line of code beside the step it belongs to.</p></div>
+      <p style="font-size:15pt;margin:2mm 0 0;max-width:200mm">An interactive prototype: students turn an algorithm in plain words into code by planting each line of code beside the step it belongs to.</p>
+      <p class="kicker" style="margin-top:8mm">Team</p>
+      <div class="team">${team.map(([name, id]) => `<strong>${esc(name)}</strong><code>${esc(id)}</code>`).join("")}</div></div>
     <div class="card">
       <div>
         <p style="margin:0;font-size:12pt"><strong>Try the working prototype:</strong> <code>${esc(LIVE)}</code>${FALLBACK ? ` (also <code>${esc(FALLBACK)}</code>)` : ""}</p>
