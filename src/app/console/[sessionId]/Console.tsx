@@ -27,7 +27,7 @@ export function Console({ sessionId }: { sessionId: string }) {
   const toast = useToast();
   const [offset, setOffset] = useState(0);
   const { data, error, mutate } = useApi<ConsoleState>(`/api/sessions/${sessionId}/console`, {
-    refreshInterval: 1500,
+    refreshInterval: (latest) => (latest?.session.status === "closed" ? 0 : 1500),
     onSuccess: (d) => setOffset(serverOffset(d.serverNow, Date.now())),
   });
   const [actionError, setActionError] = useState("");
@@ -59,6 +59,35 @@ export function Console({ sessionId }: { sessionId: string }) {
   if (error) return <PageShell><ErrorState message={error.message} backHref="/teach" backLabel="Back to my courses" /></PageShell>;
   if (!data) return <PageShell><Loading /></PageShell>;
   const { session, round } = data;
+  // The console only follows the current Round; a closed Session is looked back on in its summary, every Round at once.
+  if (closed) {
+    return (
+      <PageShell>
+        <PageHeader
+          breadcrumbs={[{ label: "My courses", href: "/teach" }, { label: session.courseCode, href: courseHref(session.courseId) }, { label: "Live console" }]}
+          title="Live console"
+          description={`${session.courseCode} · This Session has closed.`}
+        />
+        <Panel>
+          <EmptyState
+            title="This Session has closed"
+            action={
+              <div className="flex flex-wrap justify-center gap-1">
+                <ButtonLink href={`/teach/courses/${session.courseId}/sessions/${session.id}`} tone="sun">
+                  See the Session summary
+                </ButtonLink>
+                <ButtonLink href={courseHref(session.courseId, "dashboard")} tone="secondary">
+                  See the course dashboard
+                </ButtonLink>
+              </div>
+            }
+          >
+            Points became XP. Every Round&apos;s decisions, reasons and results are in the Session summary.
+          </EmptyState>
+        </Panel>
+      </PageShell>
+    );
+  }
   const status = round?.timer.status;
   const roundNo = (round?.position ?? 0) + 1;
   const nextNo = session.roundIndex + 2;
@@ -261,48 +290,45 @@ export function Console({ sessionId }: { sessionId: string }) {
       </Panel>
     );
 
-  const demoTool = (className: string) =>
-    !closed && (
-      <Panel className={cx("!bg-[#eef3f8]", className)}>
-        <Heading>Demo tool: simulated students</Heading>
-        <p className="text-xs">For demos only. Simulated students are marked in every table and export.</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            max={60}
-            value={botCount}
-            onChange={(e) => setBotCount(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
-            className="px-input !w-20"
-            aria-label="How many simulated students"
-          />
-          <Button tone="water" disabled={busy} onClick={addBots}>
-            Add
-          </Button>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={botsOn} onChange={(e) => setBotsOn(e.target.checked)} /> They keep playing
-          </label>
-        </div>
-      </Panel>
-    );
+  const demoTool = (className: string) => (
+    <Panel className={cx("!bg-[#eef3f8]", className)}>
+      <Heading>Demo tool: simulated students</Heading>
+      <p className="text-xs">For demos only. Simulated students are marked in every table and export.</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <input
+          type="number"
+          min={1}
+          max={60}
+          value={botCount}
+          onChange={(e) => setBotCount(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+          className="px-input !w-20"
+          aria-label="How many simulated students"
+        />
+        <Button tone="water" disabled={busy} onClick={addBots}>
+          Add
+        </Button>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={botsOn} onChange={(e) => setBotsOn(e.target.checked)} /> They keep playing
+        </label>
+      </div>
+    </Panel>
+  );
 
   const barStatus = !round
     ? `Lobby · ${session.participants} ${session.participants === 1 ? "student" : "students"}`
     : `Round ${roundNo} · ${status === "running" ? formatClock(left) : status === "revealed" ? "solution shown" : ROUND_STATUS[round.timer.status].label}`;
 
-  const hint = closed
-    ? "This Session has closed."
-    : !round
-      ? `${session.participants} ${session.participants === 1 ? "student is" : "students are"} waiting in the Lobby. Start when you're ready.`
-      : status === "running"
-        ? `Round ${roundNo} is running.`
-        : status === "paused"
-          ? "Paused. Students can't plant until you resume."
-          : status === "ended"
-            ? `Round ${roundNo} has ended. Reveal the solution to talk it through.`
-            : hasNext
-              ? `The solution is shown. Start Round ${nextNo} when the class is ready.`
-              : "That was the last Round. Close the Session to turn points into XP.";
+  const hint = !round
+    ? `${session.participants} ${session.participants === 1 ? "student is" : "students are"} waiting in the Lobby. Start when you're ready.`
+    : status === "running"
+      ? `Round ${roundNo} is running.`
+      : status === "paused"
+        ? "Paused. Students can't plant until you resume."
+        : status === "ended"
+          ? `Round ${roundNo} has ended. Reveal the solution to talk it through.`
+          : hasNext
+            ? `The solution is shown. Start Round ${nextNo} when the class is ready.`
+            : "That was the last Round. Close the Session to turn points into XP.";
 
   return (
     <PageShell>
@@ -332,57 +358,40 @@ export function Console({ sessionId }: { sessionId: string }) {
             <p className="mt-1 text-sm" role="status">
               {hint}
             </p>
-            {!closed && <div className="mt-3 hidden flex-wrap gap-1 lg:flex">{roundButtons(false)}</div>}
-            <div className={cx(!closed && "hidden lg:block")}>
+            <div className="mt-3 hidden flex-wrap gap-1 lg:flex">{roundButtons(false)}</div>
+            <div className="hidden lg:block">
               <ErrorNote>{actionError}</ErrorNote>
             </div>
-            {!closed && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-parchment-dark pt-3">
-                <p className="text-xs text-ink-soft">Closing ends the Session for everyone and turns points into XP.</p>
-                <Button tone="danger" disabled={busy} onClick={closeSession}>
-                  Close Session
-                </Button>
-              </div>
-            )}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-parchment-dark pt-3">
+              <p className="text-xs text-ink-soft">Closing ends the Session for everyone and turns points into XP.</p>
+              <Button tone="danger" disabled={busy} onClick={closeSession}>
+                Close Session
+              </Button>
+            </div>
           </Panel>
 
-          {closed ? (
-            <Panel>
-              <EmptyState
-                title="This Session has closed"
-                action={
-                  <ButtonLink href={courseHref(session.courseId, "dashboard")} tone="secondary">
-                    See the course dashboard
-                  </ButtonLink>
-                }
-              >
-                Every decision below is kept, and the results are in the course dashboard.
-              </EmptyState>
-            </Panel>
-          ) : (
-            <Panel>
-              <p className="mb-2 flex flex-wrap items-center gap-2 font-pixel text-xl">
-                {round ? `Round ${roundNo}: ${round.exercise.title}` : "Lobby"}
-                {round && <LanguageTag language={round.exercise.language} />}
+          <Panel>
+            <p className="mb-2 flex flex-wrap items-center gap-2 font-pixel text-xl">
+              {round ? `Round ${roundNo}: ${round.exercise.title}` : "Lobby"}
+              {round && <LanguageTag language={round.exercise.language} />}
+            </p>
+            {round && <SunTimer timer={round.timer} left={left} />}
+            <div className="mt-3">
+              <Meter value={data.progress.placed} max={data.progress.dealt} color="#e9b949" label="Class progress" />
+              <p className="mt-1 text-sm">
+                {data.progress.placed} of {data.progress.dealt} seeds planted · {session.participants} students
               </p>
-              {round && <SunTimer timer={round.timer} left={left} />}
-              <div className="mt-3">
-                <Meter value={data.progress.placed} max={data.progress.dealt} color="#e9b949" label="Class progress" />
-                <p className="mt-1 text-sm">
-                  {data.progress.placed} of {data.progress.dealt} seeds planted · {session.participants} students
-                </p>
-              </div>
-              <ol className="mt-3 flex flex-wrap gap-2 text-sm" aria-label="Rounds in this Session">
-                {session.rounds.map((r) => (
-                  <li key={r.position}>
-                    <Tag color={ROUND_STATUS[r.status].color}>
-                      {r.position + 1}. {r.exerciseTitle} · {Math.round(r.timeLimitS / 60)} min · {ROUND_STATUS[r.status].label}
-                    </Tag>
-                  </li>
-                ))}
-              </ol>
-            </Panel>
-          )}
+            </div>
+            <ol className="mt-3 flex flex-wrap gap-2 text-sm" aria-label="Rounds in this Session">
+              {session.rounds.map((r) => (
+                <li key={r.position}>
+                  <Tag color={ROUND_STATUS[r.status].color}>
+                    {r.position + 1}. {r.exerciseTitle} · {Math.round(r.timeLimitS / 60)} min · {ROUND_STATUS[r.status].label}
+                  </Tag>
+                </li>
+              ))}
+            </ol>
+          </Panel>
 
           {hardestSteps("hidden lg:block")}
           {demoTool("hidden lg:block")}
@@ -486,25 +495,23 @@ export function Console({ sessionId }: { sessionId: string }) {
         </div>
       </div>
 
-      {!closed && (
-        <div className="sticky bottom-0 z-20 mt-4 lg:hidden">
-          <div className="px-panel px-panel-wood !mx-1 !mb-1 p-2">
-            <ErrorNote>{actionError}</ErrorNote>
-            <div className="flex flex-wrap items-center justify-between gap-x-2">
-              <p className="px-1 font-pixel text-lg">{barStatus}</p>
-              <div className="flex flex-wrap justify-end gap-x-1">
-                {status === "revealed" && !hasNext ? (
-                  <a href="#round-controls" className="px-1 py-2 text-sm font-bold underline">
-                    Close the Session
-                  </a>
-                ) : (
-                  roundButtons(true)
-                )}
-              </div>
+      <div className="sticky bottom-0 z-20 mt-4 lg:hidden">
+        <div className="px-panel px-panel-wood !mx-1 !mb-1 p-2">
+          <ErrorNote>{actionError}</ErrorNote>
+          <div className="flex flex-wrap items-center justify-between gap-x-2">
+            <p className="px-1 font-pixel text-lg">{barStatus}</p>
+            <div className="flex flex-wrap justify-end gap-x-1">
+              {status === "revealed" && !hasNext ? (
+                <a href="#round-controls" className="px-1 py-2 text-sm font-bold underline">
+                  Close the Session
+                </a>
+              ) : (
+                roundButtons(true)
+              )}
             </div>
           </div>
         </div>
-      )}
+      </div>
     </PageShell>
   );
 }

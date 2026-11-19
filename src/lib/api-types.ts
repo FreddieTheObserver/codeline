@@ -237,6 +237,53 @@ export type ConsoleState = {
 
 export type ControlAction = "start" | "pause" | "resume" | "end" | "reveal" | "next" | "close";
 
+export type SessionReportRound = {
+  position: number;
+  exerciseTitle: string;
+  language: string;
+  timeLimitS: number;
+  status: RoundStatus;
+  startedAt: string | null;
+  endedAt: string | null;
+  progress: { placed: number; dealt: number };
+  steps: SlotStatDto[];
+  // Every Placement in the Round, oldest first.
+  placements: ConsolePlacement[];
+};
+
+export type SessionReportStudent = {
+  userId: string;
+  name: string;
+  loginId: string;
+  nickname: string;
+  isSimulated: boolean;
+  team: number | null;
+  points: number;
+  rank: number;
+  placed: number;
+  dealt: number;
+  wrong: number;
+  firstTryRate: number | null;
+  reasons: number;
+};
+
+// A read-only look back at one Session, for the lecturer and teaching assistants.
+export type SessionReport = {
+  session: {
+    id: string;
+    status: "lobby" | "live" | "closed";
+    mode: "solo" | "teams";
+    handSize: number;
+    createdAt: string;
+    closedAt: string | null;
+    canRun: boolean;
+  };
+  course: { id: string; code: string; title: string };
+  rounds: SessionReportRound[];
+  students: SessionReportStudent[];
+  teams: TeamDto[];
+};
+
 export type DashboardStudent = {
   userId: string;
   name: string;

@@ -194,9 +194,15 @@ export function CourseView({ courseId, initialTab }: { courseId: string; initial
                           <Tag color={SESSION_STATUS[s.status].color}>{SESSION_STATUS[s.status].label}</Tag>
                         </td>
                         <td className="text-right">
-                          <Link href={`/console/${s.id}`} className="font-bold underline underline-offset-2">
-                            {s.status === "closed" ? "View decisions" : "Open console"}
-                          </Link>
+                          {s.status !== "closed" && course.canRun ? (
+                            <Link href={`/console/${s.id}`} className="font-bold underline underline-offset-2">
+                              Open console
+                            </Link>
+                          ) : (
+                            <Link href={`/teach/courses/${courseId}/sessions/${s.id}`} className="font-bold underline underline-offset-2">
+                              View summary
+                            </Link>
+                          )}
                         </td>
                       </tr>
                     ))}

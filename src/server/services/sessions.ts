@@ -19,7 +19,7 @@ import {
 } from "../db/schema";
 import { badRequest, conflict, forbidden, notFound } from "../http";
 import { pushControl } from "../realtime";
-import { requireEnrolled, staffAccess } from "./access";
+import { canRunCourse, requireEnrolled, staffAccess } from "./access";
 import { dealHand } from "@/domain/dealing";
 import { fitsSlot } from "@/domain/judge";
 import { scoreCorrect, SPOTLIGHT_BONUS } from "@/domain/scoring";
@@ -27,13 +27,14 @@ import { pickTeam, teamScore, TEAM_COLORS, TEAM_NAMES } from "@/domain/teams";
 import { randomSeed, seededRng } from "@/domain/random";
 import { BADGE_BY_ID, isLoopHeader, SHARP_EYE_STREAK, THINKER_REASONS, type BadgeId } from "@/domain/badges";
 import { levelForXp } from "@/domain/levels";
-import { classProgress, slotStats } from "@/domain/aggregate";
+import { classProgress, slotStats, studentStats } from "@/domain/aggregate";
 import type {
   BadgeEarned,
   ConsoleState,
   ControlAction,
   PlaceResult,
   ProjectorState,
+  SessionReport,
   SlotDto,
   StudentState,
   TeamDto,
@@ -859,6 +860,116 @@ export async function consoleState(viewer: Viewer, sessionId: string): Promise<C
       placements: feed,
       stats,
       progress,
+    };
+  });
+}
+
+// Every Round of a Session at once, for looking back after class. Teaching assistants can read any Course.
+export async function sessionReport(viewer: Viewer, courseId: string, sessionId: string): Promise<SessionReport> {
+  return readView(sessionId, async (tx, s, course) => {
+    if (course.id !== courseId) throw notFound("Session not found.");
+    await staffAccess(viewer, course.id, "read");
+    const canRun = await canRunCourse(viewer, course.id);
+    const all = await loadRounds(tx, sessionId);
+    const list = await standings(tx, sessionId);
+    const roundIds = all.map((a) => a.r.id);
+    const allHands = roundIds.length
+      ? await tx
+          .select({ roundId: hands.roundId, userId: hands.userId, rowId: hands.rowId, placedSlotId: hands.placedSlotId })
+          .from(hands)
+          .where(inArray(hands.roundId, roundIds))
+      : [];
+    const allPlacements = roundIds.length
+      ? await tx
+          .select({ p: placements, name: users.name, nickname: users.nickname })
+          .from(placements)
+          .innerJoin(users, eq(users.id, placements.userId))
+          .where(inArray(placements.roundId, roundIds))
+          .orderBy(asc(placements.createdAt))
+      : [];
+    const rowsByExercise = new Map<string, RowRow[]>();
+    for (const { r } of all) {
+      if (!rowsByExercise.has(r.exerciseId)) rowsByExercise.set(r.exerciseId, await loadRows(tx, r.exerciseId));
+    }
+
+    const roundViews: SessionReport["rounds"] = all.map(({ r, title, language }) => {
+      const rows = rowsByExercise.get(r.exerciseId) ?? [];
+      const rowById = new Map(rows.map((row) => [row.id, row]));
+      const roundHands = allHands.filter((h) => h.roundId === r.id);
+      const roundPlacements = allPlacements.filter(({ p }) => p.roundId === r.id);
+      return {
+        position: r.position,
+        exerciseTitle: title,
+        language,
+        timeLimitS: r.timeLimitS,
+        status: r.status,
+        startedAt: r.startedAt?.toISOString() ?? null,
+        endedAt: r.endedAt?.toISOString() ?? null,
+        progress: classProgress(roundHands),
+        steps: slotStats(rows, roundHands, roundPlacements.map(({ p }) => p)),
+        placements: roundPlacements.map(({ p, name, nickname }) => ({
+          id: p.id,
+          userId: p.userId,
+          name,
+          nickname,
+          snippet: rowById.get(p.rowId)?.code ?? "",
+          slotPosition: (rowById.get(p.slotId)?.position ?? 0) + 1,
+          slotPseudocode: rowById.get(p.slotId)?.pseudocode ?? "",
+          correct: p.correct,
+          attempt: p.attempt,
+          reason: p.reason,
+          spotlighted: p.spotlighted,
+          at: p.createdAt.toISOString(),
+        })),
+      };
+    });
+
+    const tally = new Map<string, { placed: number; dealt: number; wrong: number; reasons: number }>();
+    const tallyOf = (userId: string) => {
+      const t = tally.get(userId) ?? { placed: 0, dealt: 0, wrong: 0, reasons: 0 };
+      tally.set(userId, t);
+      return t;
+    };
+    for (const h of allHands) {
+      const t = tallyOf(h.userId);
+      t.dealt++;
+      if (h.placedSlotId) t.placed++;
+    }
+    for (const { p } of allPlacements) {
+      const t = tallyOf(p.userId);
+      if (!p.correct) t.wrong++;
+      if (p.reason) t.reasons++;
+    }
+    const firstTry = studentStats(allPlacements.map(({ p }) => p));
+
+    return {
+      session: {
+        id: s.id,
+        status: s.status,
+        mode: s.mode,
+        handSize: s.handSize,
+        createdAt: s.createdAt.toISOString(),
+        closedAt: s.closedAt?.toISOString() ?? null,
+        canRun,
+      },
+      course: { id: course.id, code: course.code, title: course.title },
+      rounds: roundViews,
+      students: list.map((p) => {
+        const t = tally.get(p.userId) ?? { placed: 0, dealt: 0, wrong: 0, reasons: 0 };
+        return {
+          userId: p.userId,
+          name: p.name,
+          loginId: p.loginId,
+          nickname: p.nickname,
+          isSimulated: p.isSimulated,
+          team: p.team,
+          points: p.points,
+          rank: p.rank,
+          ...t,
+          firstTryRate: firstTry.get(p.userId)?.firstTryRate ?? null,
+        };
+      }),
+      teams: teamsOf(s, list),
     };
   });
 }
