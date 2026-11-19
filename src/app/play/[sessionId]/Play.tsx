@@ -359,11 +359,20 @@ function LobbyView({ nickname, count }: { nickname: string; count: number }) {
 
 function ResultView({ result, revealed }: { result: NonNullable<StudentState["result"]>; revealed: boolean }) {
   const climb = result.previousRank ? result.previousRank - result.rank : 0;
+  const sprite = result.harvested ? BASKET : SPROUT;
+  // Phones stack the card, so its picture shrinks to sit beside the title; from sm up it is one row.
   return (
-    <Panel className="flex flex-wrap items-center gap-4 !bg-[#fff3c4]">
-      <Sprite grid={result.harvested ? BASKET : SPROUT} scale={5} />
-      <div className="flex-1">
-        <p className="font-pixel text-2xl">{result.harvested ? "Harvest!" : "Dusk falls on the garden"}</p>
+    <Panel className="flex flex-col gap-3 !bg-[#fff3c4] sm:flex-row sm:items-center sm:gap-4">
+      <span className="hidden shrink-0 sm:block">
+        <Sprite grid={sprite} scale={5} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-2 font-pixel text-2xl">
+          <span className="shrink-0 sm:hidden">
+            <Sprite grid={sprite} scale={3} />
+          </span>
+          {result.harvested ? "Harvest!" : "Dusk falls on the garden"}
+        </p>
         <p>
           +{result.roundPoints.toLocaleString()} points this Round · you&apos;re #{result.rank}
           {climb > 0 && <strong> · you climbed {climb} {climb === 1 ? "place" : "places"}!</strong>}
@@ -372,7 +381,7 @@ function ResultView({ result, revealed }: { result: NonNullable<StudentState["re
         <p className="text-xs text-ink-soft">A Round ends when time runs out or as soon as every gardener has planted every seed.</p>
       </div>
       {result.badges.length > 0 && (
-        <div className="flex gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           {result.badges.map((b) => (
             <span key={b.id} title={b.name}>
               <Sprite grid={BADGE_ICONS[b.icon] ?? STAR} scale={3} title={b.name} />

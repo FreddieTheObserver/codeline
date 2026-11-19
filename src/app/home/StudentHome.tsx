@@ -43,18 +43,24 @@ export function StudentHome() {
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-4">
           {live.map((c) => (
-            <Panel key={c.id} className="flex flex-wrap items-center gap-4 !bg-[#fff3c4]">
-              <span className="anim-bob">
+            // Phones stack the card, so its sprout shrinks to sit beside "Live now"; from sm up it is one row.
+            <Panel key={c.id} className="flex flex-col gap-3 !bg-[#fff3c4] sm:flex-row sm:items-center sm:gap-4">
+              <span className="anim-bob hidden shrink-0 sm:block">
                 <Sprite grid={SPROUT} scale={5} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-pixel text-sm uppercase">Live now</p>
-                <p className="font-pixel text-2xl">
+                <p className="flex items-center gap-2 font-pixel text-sm uppercase">
+                  <span className="anim-bob sm:hidden">
+                    <Sprite grid={SPROUT} scale={3} />
+                  </span>
+                  Live now
+                </p>
+                <p className="font-pixel text-xl sm:text-2xl">
                   {c.code} · {c.title}
                 </p>
                 <p className="text-sm">{c.live?.status === "lobby" ? "The gate is open. Come in and wait for the first Round." : "A Round is growing right now."}</p>
               </div>
-              <ButtonLink href={`/play/${c.live!.sessionId}`} tone="sun" className="text-lg">
+              <ButtonLink href={`/play/${c.live!.sessionId}`} tone="sun" className="shrink-0 text-lg whitespace-nowrap">
                 Join the garden
               </ButtonLink>
             </Panel>
