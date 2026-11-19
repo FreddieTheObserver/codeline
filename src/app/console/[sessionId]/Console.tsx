@@ -460,8 +460,11 @@ export function Console({ sessionId }: { sessionId: string }) {
                   )}
                   {data.participants.map((p) => (
                     <tr key={p.userId} className="border-t border-parchment-dark">
-                      <td className="py-1 pr-2">
-                        {p.name} {p.isSimulated && <Tag className="ml-1">simulated</Tag>}
+                      <td className="py-1 pr-4">
+                        <span className="flex items-center justify-between gap-2">
+                          {p.name}
+                          {p.isSimulated && <Tag className="shrink-0">simulated</Tag>}
+                        </span>
                         <span className="block text-xs text-ink-soft">{p.isSimulated ? "" : p.loginId}</span>
                       </td>
                       <td className="pr-2">

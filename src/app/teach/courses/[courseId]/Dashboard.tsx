@@ -105,10 +105,12 @@ export function Dashboard({ courseId }: { courseId: string }) {
               {students.map((s) => (
                 <tr key={s.userId} className="border-t border-parchment-dark">
                   <td className={`${STUDENT_CELL} py-1.5`}>
-                    <Link href={`/teach/courses/${courseId}/students/${s.userId}`} className="font-bold underline">
-                      {s.name}
-                    </Link>
-                    {s.isSimulated && <Tag className="ml-1">simulated</Tag>}
+                    <span className="flex items-center justify-between gap-2">
+                      <Link href={`/teach/courses/${courseId}/students/${s.userId}`} className="font-bold underline">
+                        {s.name}
+                      </Link>
+                      {s.isSimulated && <Tag className="shrink-0">simulated</Tag>}
+                    </span>
                     <span className="block text-xs text-ink-soft">{s.nickname}</span>
                   </td>
                   <td className={NUMBER_CELL}>{s.rounds}</td>

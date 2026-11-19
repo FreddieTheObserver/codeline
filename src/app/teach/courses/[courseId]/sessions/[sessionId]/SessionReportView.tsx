@@ -129,10 +129,12 @@ export function SessionReportView({ courseId, sessionId }: { courseId: string; s
                   <tr key={s.userId} className="border-t border-parchment-dark">
                     <td className="py-1.5 pr-2 text-right tabular-nums">{s.rank}</td>
                     <td className="px-2">
-                      <Link href={`/teach/courses/${courseId}/students/${s.userId}`} className="font-bold underline">
-                        {s.name}
-                      </Link>
-                      {s.isSimulated && <Tag className="ml-1">simulated</Tag>}
+                      <span className="flex items-center justify-between gap-2">
+                        <Link href={`/teach/courses/${courseId}/students/${s.userId}`} className="font-bold underline">
+                          {s.name}
+                        </Link>
+                        {s.isSimulated && <Tag className="shrink-0">simulated</Tag>}
+                      </span>
                     </td>
                     <td className="px-2">{s.nickname}</td>
                     {session.mode === "teams" && (
