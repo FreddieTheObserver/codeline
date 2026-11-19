@@ -100,6 +100,8 @@ export function SessionSetup({ detail, onCreated }: { detail: CourseDetail; onCr
         rounds: rounds.map((r) => ({ exerciseId: r.exerciseId, timeLimitS: Math.round(r.minutes * 60) })),
       });
       toast("The Lobby is open. Put the projector view on screen so students can join.");
+      // Next.js keeps this page alive for when the lecturer comes back, so the button must not stay busy.
+      setBusy(false);
       onCreated(id);
     } catch (err) {
       setError(errorText(err));

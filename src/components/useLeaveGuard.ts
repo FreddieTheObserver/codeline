@@ -24,7 +24,7 @@ export function useLeaveGuard(dirty: boolean, what: string) {
       e.stopPropagation();
       void confirm({
         title: "Leave without saving?",
-        body: `Your changes to ${what} aren't saved yet. If you leave now, they're lost.`,
+        body: `Your changes to ${what} aren't saved yet.`,
         confirmLabel: "Leave without saving",
         cancelLabel: "Keep editing",
         tone: "danger",

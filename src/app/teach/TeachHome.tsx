@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Modal, useToast } from "@/components/feedback";
 import { PageShell } from "@/components/PageShell";
 import { Sprite } from "@/components/pixel/Sprite";
@@ -14,6 +14,8 @@ import type { StaffCourseCard, Viewer } from "@/lib/api-types";
 export function TeachHome() {
   const { data, error } = useApi<{ viewer: Viewer; courses: StaffCourseCard[] }>("/api/teach", { refreshInterval: 10000 });
   const [creating, setCreating] = useState(false);
+  // Next.js keeps this page alive while hidden; a dialog left open must not be waiting when the lecturer returns.
+  useLayoutEffect(() => () => setCreating(false), []);
 
   if (error) return <PageShell><ErrorState message={error.message} backHref="/" backLabel="Back to the start" /></PageShell>;
   if (!data) return <PageShell><Loading /></PageShell>;

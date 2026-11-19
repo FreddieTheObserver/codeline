@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Board, type PlotView } from "@/components/garden/Board";
 import { HandTray } from "@/components/garden/HandTray";
@@ -49,6 +49,25 @@ export function ExerciseEditor({
   const [testing, setTesting] = useState(false);
   useLeaveGuard(canEdit && dirty, initial ? initial.title : "this new Exercise");
 
+  // Next.js keeps the New Exercise page alive after it moves on to the saved Exercise.
+  // Once that Exercise exists, the next visit must start from a blank form, not from it.
+  const blankWhenHidden = useRef(false);
+  useLayoutEffect(
+    () => () => {
+      if (!blankWhenHidden.current) return;
+      blankWhenHidden.current = false;
+      setTitle("");
+      setDescription("");
+      setLanguage("java");
+      setRows([]);
+      setPaste("");
+      setError("");
+      setDirty(false);
+      setTesting(false);
+    },
+    [],
+  );
+
   const edit = <T,>(set: (value: T) => void) => (value: T) => {
     set(value);
     setDirty(true);
@@ -95,6 +114,7 @@ export function ExerciseEditor({
       } else {
         const { id } = await post<{ id: string }>(`/api/courses/${courseId}/exercises`, body);
         setDirty(false);
+        blankWhenHidden.current = true;
         toast(`${title || "Exercise"} is created. Test play it before class.`);
         router.replace(`/teach/exercises/${id}`);
       }
