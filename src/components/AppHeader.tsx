@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useState } from "react";
-import { errorText, post, useApi } from "@/lib/client";
-import { hasUnsavedChanges, setLeaving } from "@/lib/leaving";
+import { Suspense } from "react";
+import { useApi } from "@/lib/client";
 import type { Viewer } from "@/lib/api-types";
-import { flashToast, useConfirm, useToast } from "./feedback";
 import { homeFor, isActive, navFor, roleLabel, type NavLink } from "./nav";
 import { Sprite } from "./pixel/Sprite";
 import { BLOOM } from "./pixel/sprites";
 import { Button, ButtonLink, cx } from "./ui";
+import { useSignOut } from "./useSignOut";
 
 function NavLinks({ links, pathname }: { links: NavLink[]; pathname: string | null }) {
   return (
@@ -42,40 +41,10 @@ function ActiveNav({ links }: { links: NavLink[] }) {
 }
 
 export function AppHeader() {
-  const toast = useToast();
-  const confirm = useConfirm();
   const { data } = useApi<{ viewer: Viewer | null }>("/api/me");
   const viewer = data?.viewer ?? null;
   const links = navFor(viewer);
-  const [signingOut, setSigningOut] = useState(false);
-
-  async function signOut() {
-    if (hasUnsavedChanges()) {
-      const ok = await confirm({
-        title: "Sign out without saving?",
-        body: "This page has changes that aren't saved yet.",
-        confirmLabel: "Sign out without saving",
-        cancelLabel: "Keep editing",
-        tone: "danger",
-      });
-      if (!ok) return;
-    }
-    setLeaving(true);
-    setSigningOut(true);
-    try {
-      await post("/api/auth/signout");
-    } catch (err) {
-      setLeaving(false);
-      setSigningOut(false);
-      toast(`Couldn't sign out: ${errorText(err)}`, "error");
-      return;
-    }
-    flashToast("You signed out. See you in the next Session.");
-    // A full page load, not a client navigation: Next.js keeps recently visited pages alive but hidden,
-    // and on a shared classroom computer none of them, nor any cached data, may outlive the sign-out.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.assign("/");
-  }
+  const { signOut, signingOut } = useSignOut();
 
   return (
     <header className="px-panel px-panel-wood flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 sm:px-4">

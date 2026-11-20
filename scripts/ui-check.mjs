@@ -163,6 +163,22 @@ await wait(500);
 check("sign-in form is empty for the next person", (await guest.inputValue("input[type=password]:visible")) === "" && (await guest.inputValue("input[autocomplete=username]:visible")) === "");
 check("sign-in button is ready", await guest.locator("form button[type=submit]:visible").isEnabled());
 
+// On a shared computer the next student meets "Continue as" on the landing page, which has no header, so it signs out too.
+const shared = await signedIn("student");
+await shared.page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+check("landing offers Continue as when signed in", (await shared.page.getByRole("link", { name: /Continue as/ }).count()) === 1);
+await shared.page.getByRole("button", { name: "Sign out" }).click();
+// The URL stays "/", and the signed-out buttons render before /api/me answers, so only the flash proves the reload happened.
+const reloaded = await shared.page
+  .getByText(/You signed out/)
+  .waitFor({ timeout: 10000 })
+  .then(() => true, () => false);
+check("landing sign-out shows the signed-out message", reloaded);
+await shared.page.waitForLoadState("networkidle");
+check("landing sign-out offers sign-up again", (await shared.page.getByRole("link", { name: "Create an account" }).count()) >= 1);
+check("landing sign-out removes Continue as", (await shared.page.getByText(/Continue as/).count()) === 0);
+check("landing sign-out ends the login session", (await (await shared.api.get(`${BASE}/api/me`)).json()).viewer === null);
+
 await browser.close();
 if (failures.length) {
   console.log(`\n${failures.length} UI check(s) failed.`);
