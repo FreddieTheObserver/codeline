@@ -6,6 +6,16 @@ Each pseudocode step is a signpost beside an empty plot, each student holds a po
 It is the interactive prototype for CSC213 Term Project 2.
 Domain terms are in [GLOSSARY.md](GLOSSARY.md), design decisions in [docs/design.md](docs/design.md), and the reasoning behind the bigger choices in [docs/adr](docs/adr).
 
+## Team
+
+| Name | Student ID |
+|---|---|
+| Phapawarin Wongwuttipong | 68130500848 |
+| Theeranthorn Hemakunseht | 68130500864 |
+| Nontawat Kittiwiwat | 68130500816 |
+| Kyaw Zall Thwin | 68130500828 |
+| La Yaung Phyo | 68130500852 |
+
 ## Stack
 
 - Next.js 16 (App Router, Cache Components) on Vercel, in the Singapore region.
