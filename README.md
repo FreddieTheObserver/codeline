@@ -96,3 +96,7 @@ node scripts/build-pdf.mjs ../codeline-deliverables/screens ../codeline-delivera
 The capture script needs freshly seeded data and walks every business process through the real app.
 Start the server with `NEXT_PUBLIC_SITE_URL=https://codeline.layaungphyo.dev`, so the projector's join link and QR code show the live address rather than localhost.
 `scripts/demo-live.ts` opens a live CSC101 Session with simulated classmates for a quick demo.
+
+## License
+
+CodeLine is released under the [MIT License](LICENSE).
