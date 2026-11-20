@@ -97,6 +97,17 @@ The capture script needs freshly seeded data and walks every business process th
 Start the server with `NEXT_PUBLIC_SITE_URL=https://codeline.layaungphyo.dev`, so the projector's join link and QR code show the live address rather than localhost.
 `scripts/demo-live.ts` opens a live CSC101 Session with simulated classmates for a quick demo.
 
+## Demo video footage
+
+```sh
+node scripts/record-demo.mjs http://localhost:3210 ../codeline-video/public/footage
+```
+
+This plays one live Session through the real app and films each view: the lecturer's laptop, the student's laptop and phone, the phone console and the projector.
+It writes one MP4 per view and a `markers.json` that the video project in `../codeline-video` cuts to.
+Run it against a production build (`bun run build`, then `bun run start -- -p 3210`) on freshly seeded data, so the dev badge stays out of frame.
+It needs ffmpeg on the PATH.
+
 ## License
 
 CodeLine is released under the [MIT License](LICENSE).
