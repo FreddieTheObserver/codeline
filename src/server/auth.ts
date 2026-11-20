@@ -18,12 +18,13 @@ export async function startLoginSession(userId: string): Promise<void> {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + LIFETIME_DAYS * 86_400_000);
   await db.insert(loginSessions).values({ userId, tokenHash: sha256(token), expiresAt });
+  // No expiry on the cookie, so the browser drops it on close: on a shared classroom computer the next student
+  // doesn't find the last one still signed in. expiresAt still ends a login in a browser that is never closed.
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    expires: expiresAt,
   });
 }
 

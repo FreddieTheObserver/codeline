@@ -110,6 +110,8 @@ The full 200 at the same time (S1-IT-03) needs Supabase's paid tier or a dedicat
 
 Supabase Auth limits sign-ins to 30 per 5 minutes per IP address by default, and a whole classroom on one Wi-Fi shares one public IP.
 CodeLine therefore signs people in itself: a users table with hashed passwords, and a session cookie that page scripts can't read.
+The cookie has no expiry date, so a login ends when the browser closes, and the next student at a shared classroom computer doesn't find the last one still signed in.
+The server also ends every login after 14 days, for a browser that is never closed.
 Supabase is used only for Postgres and Realtime, and only the server talks to the database.
 
 ## Hosting

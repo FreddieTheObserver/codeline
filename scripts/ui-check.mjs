@@ -149,6 +149,8 @@ await guest.waitForLoadState("networkidle");
 check("header shows the signed-in student", (await header().getByText("Demo Student").count()) === 1);
 check("header offers no Sign in once signed in", (await header().getByRole("link", { name: "Sign in" }).count()) === 0);
 check("welcome message shown", (await guest.getByText("Welcome back, Comet.").count()) === 1);
+const authCookie = (await guest.context().cookies()).find((c) => c.name === "cl_auth");
+check("login ends when the browser closes", authCookie?.expires === -1, `expires ${authCookie?.expires}`);
 await header().getByRole("button", { name: "Sign out" }).click();
 await guest.waitForURL(`${BASE}/`);
 await guest.waitForLoadState("networkidle");
